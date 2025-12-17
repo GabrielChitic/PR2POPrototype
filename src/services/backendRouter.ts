@@ -29,7 +29,7 @@ const ROUTING_RULES: RoutingRule[] = [
   // Rule 2: IT Hardware + RO01 → SAP_MM
   {
     system: "SAP_MM",
-    matcher: (intent, context) =>
+    matcher: (_intent, context) =>
       context.category === "IT Hardware" && context.entity === "RO01",
     reasoningTemplate: (_, context) =>
       `IT Hardware purchases for entity ${context.entity} are processed through SAP Materials Management`,
@@ -39,7 +39,7 @@ const ROUTING_RULES: RoutingRule[] = [
   // Rule 3: Marketing Services + US01 → Coupa
   {
     system: "Coupa",
-    matcher: (intent, context) =>
+    matcher: (_intent, context) =>
       context.category === "Marketing Services" && context.entity === "US01",
     reasoningTemplate: (_, context) =>
       `Marketing Services for entity ${context.entity} are managed via Coupa`,
@@ -49,7 +49,7 @@ const ROUTING_RULES: RoutingRule[] = [
   // Rule 4: Consulting Services → Coupa
   {
     system: "Coupa",
-    matcher: (intent, context) => context.category === "Consulting Services",
+    matcher: (_intent, context) => context.category === "Consulting Services",
     reasoningTemplate: () => "Consulting and professional services are procured through Coupa",
     priority: 3,
   },
@@ -57,7 +57,7 @@ const ROUTING_RULES: RoutingRule[] = [
   // Rule 5: US entities → Coupa (general rule)
   {
     system: "Coupa",
-    matcher: (intent, context) => context.entity.startsWith("US"),
+    matcher: (_intent, context) => context.entity.startsWith("US"),
     reasoningTemplate: (_, context) =>
       `Entity ${context.entity} uses Coupa as primary procurement system`,
     priority: 4,
@@ -66,7 +66,7 @@ const ROUTING_RULES: RoutingRule[] = [
   // Rule 6: IT Software/SaaS → Coupa
   {
     system: "Coupa",
-    matcher: (intent, context) => context.category === "IT Software/SaaS",
+    matcher: (_intent, context) => context.category === "IT Software/SaaS",
     reasoningTemplate: () => "Software and SaaS subscriptions are managed through Coupa",
     priority: 4,
   },

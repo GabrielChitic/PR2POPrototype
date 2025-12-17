@@ -1,4 +1,4 @@
-import { useState, FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 import { Send } from "lucide-react";

@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/Card";
 import type { PurchaseRequisition } from "../types";
-import { AlertCircle, CheckCircle, Info } from "lucide-react";
+import { AlertCircle, Info } from "lucide-react";
 
 interface PRDetailsPanelProps {
   pr: PurchaseRequisition | null;
