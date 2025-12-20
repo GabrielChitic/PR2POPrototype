@@ -100,7 +100,7 @@ export function RequesterModuleV2() {
   };
 
   // Helper: Handle chat commands
-  const handleChatCommand = (message: string, messageLower: string): boolean => {
+  const handleChatCommand = (_message: string, messageLower: string): boolean => {
     // Restart commands
     if (messageLower.includes("new request") ||
         messageLower.includes("start over") ||
@@ -147,9 +147,6 @@ export function RequesterModuleV2() {
        messageLower.includes("is there a contract") ||
        messageLower.includes("any contracts"))
     ) {
-      // Generate mock contracts if not already generated
-      const category = draft.lineItems[0]?.category || "Professional Services";
-
       // Respond with contract availability
       if (draft.selectedContract) {
         addChatMessage(

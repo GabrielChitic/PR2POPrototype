@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { Card } from "../ui/Card";
-import { ShoppingCart, FileText, Briefcase, Upload, AlertCircle, X, Check, FileIcon, Calendar, Building2 } from "lucide-react";
+import { ShoppingCart, FileText, Briefcase, Upload, AlertCircle, X, Check, FileIcon, Calendar } from "lucide-react";
 import type { DraftPR, PurchaseInfo, RequestType, CLMContract, UploadedFile } from "../../types/workflow";
 
 interface Step2Props {
@@ -15,7 +15,6 @@ interface Step2Props {
 
 // Helper: Generate mock CLM contracts based on service request
 function generateMockCLMContracts(draft: DraftPR): CLMContract[] {
-  const category = draft.lineItems[0]?.category || "Professional Services";
   const supplier = draft.lineItems[0]?.supplier || "Unknown";
 
   const contracts: CLMContract[] = [
