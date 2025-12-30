@@ -1,184 +1,229 @@
-# PR→PO Intake Agent Prototype
+# PR2PO Prototype - Purchase Request to Purchase Order Workflow
 
-A chat-based interface for creating and managing Purchase Requisitions (PRs), built as a prototype for the Office of the CFO's Guided Buying initiative.
+An AI-powered procurement workflow system with intelligent chat interface, built with React, TypeScript, and Tailwind CSS.
 
-## Overview
+## 🚀 Quick Start
 
-This prototype demonstrates a conversational AI agent that helps employees create purchase requests through natural language. The system interprets user intent, infers context (category, urgency, location), and routes requests to the appropriate backend ERP system.
+```bash
+# Clone the repository
+git clone https://github.com/GabrielChitic/PR2POPrototype.git
+cd PR2POPrototype
 
-## Features
+# Install dependencies
+npm install
 
-- **Chat-Based Interaction**: Natural language interface for all operations
-- **Three Core Capabilities**:
-  1. **Create PR**: "I need 15 laptops for Bucharest in Q2"
-  2. **Check Status**: "Where is PR-0001?"
-  3. **List PRs**: "Show all my PRs"
-- **Intent Classification**: Automatically categorizes requests (catalog purchase, contract call-off, services, needs sourcing)
-- **Context Inference**: Extracts entity, location, category, urgency from free-text
-- **Backend Routing**: Routes to SAP_MM, Coupa, Local_ERP_X, or Sourcing_HandOff based on rules
-- **Multi-Persona Support**: Switch between personas (Ana Popescu, John Smith) with different default contexts
-- **PR Details Panel**: View comprehensive details including classification reasoning, line items, and routing decisions
+# Start development server
+npm run dev
+# Opens at http://localhost:5173 (or next available port)
 
-## Tech Stack
+# Build for production
+npm run build
+```
 
-- **Framework**: React + TypeScript + Vite
-- **UI Library**: Shadcn/ui (Tailwind CSS + Radix UI)
-- **Icons**: Lucide React
-- **State Management**: React hooks (no external state library)
-- **Storage**: In-memory (browser-based, no backend)
+## ✨ Features
 
-## Project Structure
+### Smart Chat Interface
+- **Natural Language Parsing** - "Need desks by May 20 to Munich office" automatically extracts dates, locations, and context
+- **Context-Aware Co-Pilot** - Chat assists with form filling throughout the workflow
+- **Intent Detection** - Recognizes goods, services, or free-text requests
+- **Command Support** - Help, status, restart commands
+
+### Dynamic Workflow
+- **5-Step Process** - Choose Items → Purchase Info → Review → Validation → Approvals
+- **3 Request Types** with adaptive Step 2 forms:
+  - **Catalog Goods** - Quick checkout for catalog items
+  - **Free-Text Goods** - Custom item requests
+  - **Services** - Comprehensive service procurement
+
+### CLM Integration
+- **Automatic Contract Suggestions** - Fetches relevant contracts from CLM
+- **One-Click Selection** - Link existing contracts to requests
+- **Contract Details** - View supplier, validity, category, and relevance
+
+### File Management
+- **Multi-File Upload** - Drag & drop for SoW, proposals, quotes
+- **File Metadata Tracking** - Size, type, upload date
+- **Conditional Requirements** - Automatic alerts for required attachments
+
+## 🏗️ Architecture
 
 ```
 src/
 ├── components/
-│   ├── ui/                 # Base UI components (Button, Card, Input, Select)
-│   ├── ChatMessage.tsx     # Chat message bubble component
-│   ├── ChatInput.tsx       # Message input field
-│   ├── PersonaSelector.tsx # Persona dropdown
-│   └── PRDetailsPanel.tsx  # PR details sidebar
-├── services/
-│   ├── intentClassifier.ts # Intent recognition logic
-│   ├── contextInference.ts # Context extraction from messages
-│   ├── backendRouter.ts    # Backend system routing rules
-│   └── prService.ts        # PR CRUD operations
-├── data/
-│   └── mockData.ts         # Personas, catalog, contracts
-├── types/
-│   └── index.ts            # TypeScript type definitions
-├── lib/
-│   └── utils.ts            # Utility functions
-└── App.tsx                 # Main application component
+│   ├── ui/              # Reusable UI components (Button, Input, Card, StatusPill)
+│   └── workflow/        # Workflow step components (Step1-5, Stepper)
+├── modules/
+│   ├── Requester/       # Main workflow module (RequesterModuleV2)
+│   ├── Procurement/     # Procurement team view
+│   ├── Overview/        # Dashboard
+│   └── Settings/        # Settings
+├── context/             # Global state management (PRContext)
+├── services/            # Search and API services (unifiedSearch)
+├── data/                # Mock data (catalog items, contracts)
+└── types/               # TypeScript definitions (workflow types)
 ```
 
-## Getting Started
+## 📖 Documentation
 
-### Prerequisites
+For complete development history, architecture details, and continuation instructions, see:
+- **[DEVELOPMENT_LOG.md](./DEVELOPMENT_LOG.md)** - Comprehensive development documentation with full conversation history
+- **[STYLE_GUIDE.md](./STYLE_GUIDE.md)** - UI/UX style guidelines
 
-- Node.js 18+ and npm
+## 🎯 Example Workflows
 
-### Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/GabrielChitic/PR2POPrototype.git
-cd Prototype
+### Catalog Goods
+```
+1. Chat: "Need 5 desks by May 20 to Munich office"
+2. System: Searches catalog, extracts date & location
+3. Step 1: Select items and quantities
+4. Step 2: Quick checkout form (pre-filled)
+5. Review & Submit
 ```
 
-2. Install dependencies:
-```bash
-npm install
+### Services with Contract
+```
+1. Chat: "SAP consulting services"
+2. Step 1: Add service item
+3. Step 2: Fill scope, timing, risks
+   - CLM shows 3 matching contracts
+   - Select "IT Services Framework - Accenture"
+   - Upload Statement of Work
+4. Review: Shows linked contract
+5. Submit
 ```
 
-3. Start the development server:
-```bash
-npm run dev
+### Free-Text Item
+```
+1. Chat: "Custom signage for Berlin office"
+2. No catalog match → Free text form
+3. Fill: item details, budget, supplier
+4. Step 2: Clarify business need, add specs
+5. Upload quote
+6. Review & Submit
 ```
 
-4. Open your browser to `http://localhost:5173`
+## 🛠️ Tech Stack
 
-## How to Use
+- **Frontend:** React 18 + TypeScript
+- **Build Tool:** Vite 7
+- **Styling:** Tailwind CSS
+- **Icons:** Lucide React
+- **Deployment:** Vercel (auto-deploy from main)
 
-### Creating a Purchase Request
-
-Simply type what you need in natural language:
-- "I need 15 laptops for new hires in Bucharest in Q2"
-- "We need to renew our marketing agency retainer for next FY"
-- "Please raise an RFP for a new payroll system for our German entity"
-- "Buy 20 office chairs for the London office next month"
-
-The system will:
-- Parse your request
-- Classify the intent type
-- Infer category, urgency, and other context
-- Route to the appropriate backend system
-- Create a draft PR and show you what it understood
-
-### Checking PR Status
-
-Ask about a specific PR:
-- "Where is PR-0001?"
-- "What is the status of PR-3?"
-- "Show me PR-0002"
-
-### Listing PRs
-
-View all your PRs:
-- "Show all my PRs"
-- "List the last 5 PRs"
-- "Show all PRs you've created so far"
-
-### Switching Personas
-
-Use the dropdown at the top right to switch between:
-- **Ana Popescu** - IT Project Manager (RO01, Bucharest, CEE)
-- **John Smith** - Marketing Manager (US01, New York, NA)
-
-The selected persona's defaults (entity, location, region) are used when creating PRs.
-
-## Architecture Highlights
-
-### Intent Classification
-Uses keyword matching and regex patterns with confidence scoring. Classifies messages into:
-- `catalog_purchase`: Standard catalog items (laptops, monitors, etc.)
-- `contract_call_off`: Renewal of existing contracts or retainers
-- `services_sow`: SOW-based consulting or professional services
-- `needs_sourcing`: RFP/RFQ/tender for new suppliers
-- `status_query`: Checking PR status
-- `list_query`: Listing PRs
-
-### Context Inference
-Extracts from natural language:
-- **Category**: IT Hardware, IT Software/SaaS, Marketing Services, etc.
-- **Urgency**: low, medium, high (based on keywords like "ASAP", "Q2", "next month")
-- **Needed-by date**: Extracted timing information
-- **Quantity**: Parsed from numbers in the message
-
-### Backend Routing
-Rule-based routing logic:
-- IT Hardware + RO01 → SAP_MM
-- Marketing Services + US01 → Coupa
-- Needs sourcing → Sourcing_HandOff
-- Default → Local_ERP_X
-
-### Mock Data
-Includes:
-- 2 personas with different entities and regions
-- Catalog pricing for 5 categories
-- 3 mock contracts for call-off scenarios
-
-## Development Scripts
+## 📦 Available Scripts
 
 ```bash
-npm run dev      # Start development server
-npm run build    # Build for production
+npm run dev      # Start development server with HMR
+npm run build    # TypeScript compile + Vite build
 npm run preview  # Preview production build
-npm run lint     # Run ESLint
+npm run lint     # Run ESLint (if configured)
 ```
 
-## Deployment to Vercel
+## 🔄 Continuing Development
 
-This project is ready to deploy to Vercel:
+### From Any Machine:
+1. **Clone** the repository
+2. **Read** [DEVELOPMENT_LOG.md](./DEVELOPMENT_LOG.md) for full context
+3. **Install** dependencies: `npm install`
+4. **Start** dev server: `npm run dev`
+5. **Reference** the log when starting a new Claude Code session
 
-1. Push to GitHub (already configured as origin)
-2. Import project in Vercel dashboard
-3. Vercel will auto-detect Vite and deploy
+### Key Context to Share with Claude:
+```
+"I'm continuing the PR2PO Prototype project.
+Current state: [describe what you're working on]
+Last completed: [reference DEVELOPMENT_LOG.md sections]
+Next task: [what you want to implement]"
+```
 
-## Future Enhancements
+### Important Files:
+- `DEVELOPMENT_LOG.md` - Full implementation history
+- `src/types/workflow.ts` - Core type definitions
+- `src/modules/Requester/RequesterModuleV2.tsx` - Main orchestrator (800+ lines)
+- `src/components/workflow/Step2Container.tsx` - Dynamic Step 2 (1000+ lines)
 
-- [ ] Add localStorage persistence
-- [ ] Implement actual LLM integration for more sophisticated NLP
-- [ ] Add file attachment support
-- [ ] Multi-line item support in single PR
-- [ ] PR editing and approval workflow
-- [ ] Backend API integration
-- [ ] User authentication
-- [ ] Enhanced search and filtering
+## 🚢 Deployment
 
-## License
+**Repository:** https://github.com/GabrielChitic/PR2POPrototype.git
 
-MIT
+The app auto-deploys to Vercel on every push to `main` branch.
+
+### Manual Deployment
+```bash
+git add .
+git commit -m "Your commit message"
+git push origin main
+# Vercel automatically detects and deploys
+```
+
+## 🧪 Key Implementation Details
+
+### Request Type Detection
+The system automatically determines request type based on line items:
+- **catalogGoods** - All items are from catalog
+- **freeTextGoods** - Has free-text items (no catalog match)
+- **servicesOrComplex** - Contains service items (detected by keywords: consulting, training, audit, etc.)
+
+### Step 2 Variant Switching
+Single `Step2Container` component with 3 variants:
+- **2A (Catalog)** - Minimal friction: delivery, recipient, usage, optional attachments
+- **2B (Free-text)** - Clarify need: usage, specs, supplier preference, required attachments
+- **2C (Services)** - Comprehensive: scope, timing, justification, delivery model, risks, CLM contracts
+
+### Chat Intelligence
+- **Initial parsing:** Extracts dates ("20th May"), locations ("Munich office"), projects ("Project Phoenix")
+- **Step 2 co-pilot:** Updates form fields via natural language ("deliver to Berlin", "need by May 20")
+- **Contract queries:** "Is there an existing contract?" → Lists CLM contracts with details
+
+### CLM Contract Simulation
+Generates 3 mock contracts on Step 2C:
+1. Accenture - IT Services Framework (valid until 2027)
+2. Deloitte - Professional Services MSA (valid until 2026)
+3. PwC - Consulting Framework (expiring 2025)
+
+Selection stored in `draft.selectedContract` and displayed in Step 3 summary.
+
+## 🐛 Troubleshooting
+
+### Build Errors
+- Run `npm run build` to check for TypeScript errors
+- Common: TS6133 (unused variables) - prefix with `_` or remove
+
+### Dev Server Issues
+- Port 5173 in use? Vite auto-assigns next available port
+- HMR not working? Restart dev server or clear browser cache
+
+### Git Issues
+- Check branch: `git branch`
+- Pull latest: `git pull origin main`
+- Push fails? Check network and credentials
+
+## 📊 Project Status
+
+**Current Version:** v1.0 - Full Step 2 implementation with CLM integration
+**Build Status:** ✅ Passing (TypeScript + Vite)
+**Last Updated:** 2025-12-30
+**Total Lines:** ~4,800 insertions across 26 files
+
+## 🗺️ Next Steps (Potential)
+
+See [DEVELOPMENT_LOG.md](./DEVELOPMENT_LOG.md) for detailed future work suggestions:
+- Backend API integration
+- Real CLM connection
+- Authentication & authorization
+- Advanced search (Elasticsearch, semantic search)
+- Mobile responsive improvements
+- Analytics & reporting dashboard
+
+## 📄 License
+
+[Your License Here]
+
+## 👤 Contact
+
+Gabriel Chitic - gabriel.chitic@uipath.com
 
 ---
 
-**Built with**: React, TypeScript, Vite, Tailwind CSS, Shadcn/ui
+**Repository:** https://github.com/GabrielChitic/PR2POPrototype.git
+**Documentation:** See [DEVELOPMENT_LOG.md](./DEVELOPMENT_LOG.md) for complete history
