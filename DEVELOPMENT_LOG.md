@@ -6,6 +6,188 @@
 **Tech Stack:** React + TypeScript + Vite + Tailwind CSS
 **Repository:** https://github.com/GabrielChitic/PR2POPrototype.git
 **Deployment:** Vercel (auto-deploy from main branch)
+**Node Version:** 18+ (tested with Node 18.x and 20.x)
+**Package Manager:** npm (npm 9+)
+
+---
+
+## 🤖 FOR AI ASSISTANTS (Claude Code / GitHub Copilot / Cursor)
+
+### Quick Context Restoration
+
+**If you're an AI assistant helping to continue this project, here's what you need to know:**
+
+#### **Current Project State (v1.0):**
+- ✅ **Fully functional 5-step workflow** (Step 0-5)
+- ✅ **Smart chat with natural language parsing** from initial request
+- ✅ **Dynamic Step 2** with 3 variants (catalog/free-text/services)
+- ✅ **CLM contract integration** with mock suggestions
+- ✅ **File upload system** with metadata tracking
+- ✅ **All TypeScript errors resolved** - build passes
+- ✅ **Deployed on Vercel** - auto-deploys from main branch
+
+#### **Key Entry Points:**
+1. **Main App:** `src/App.tsx` - Module router (Requester/Procurement/Overview/Settings)
+2. **Workflow Orchestrator:** `src/modules/Requester/RequesterModuleV2.tsx` (800+ lines)
+3. **Dynamic Step 2:** `src/components/workflow/Step2Container.tsx` (1000+ lines)
+4. **Type System:** `src/types/workflow.ts` - All TypeScript interfaces
+5. **Mock Data:** `src/data/catalogData.ts` - Catalog items
+6. **Search Logic:** `src/services/unifiedSearch.ts` - Intent detection
+
+#### **How to Understand This Codebase Quickly:**
+
+1. **Read these sections in order:**
+   - "Feature Implementation History" (Phases 1-10) - What was built and why
+   - "State Management" - How data flows through the app
+   - "Key Type Definitions" - The data structures
+   - "Mock Data" section - What the simulation data looks like
+
+2. **Key Concepts to Grasp:**
+   - **Workflow Step:** User progresses through steps 0→1→2→3→4→5
+   - **Request Type:** System auto-detects catalogGoods/freeTextGoods/servicesOrComplex based on items
+   - **Step 2 Variants:** Single component (`Step2Container.tsx`) that renders different forms based on requestType
+   - **Draft PR:** All form data stored in a single `DraftPR` object maintained in `RequesterModuleV2.tsx`
+   - **Chat Co-pilot:** Chat messages trigger parsing logic that auto-fills form fields
+
+3. **Common Task Scenarios:**
+
+   **Scenario A: User wants to add a new field to Step 2**
+   ```typescript
+   // 1. Update type in src/types/workflow.ts
+   export interface PurchaseInfo {
+     // ... existing fields
+     newField?: string;  // Add here
+   }
+
+   // 2. Update Step2Container.tsx
+   // Find the appropriate variant (2A/2B/2C) and add input field
+   <Input
+     value={purchaseInfo.newField}
+     onChange={(e) => onUpdate({ newField: e.target.value })}
+   />
+
+   // 3. Update validation if needed
+   const isValid2A =
+     purchaseInfo.usage?.trim().length > 0 &&
+     purchaseInfo.newField?.trim().length > 0;  // Add validation
+
+   // 4. Display in Step3Summary.tsx if needed
+   ```
+
+   **Scenario B: User wants to enhance chat parsing**
+   ```typescript
+   // Edit RequesterModuleV2.tsx, find handleStep2CoPilot() or parseInitialRequest()
+
+   // Add new parsing pattern:
+   const newFieldMatch = message.match(/new pattern here/i);
+   if (newFieldMatch) {
+     updates.newField = newFieldMatch[1].trim();
+     confirmations.push(`new field to "${newFieldMatch[1].trim()}"`);
+   }
+   ```
+
+   **Scenario C: User encounters TypeScript error**
+   ```bash
+   # 1. Read the error - usually TS6133 (unused var) or TS2741 (missing property)
+   # 2. For unused vars: prefix with underscore or remove
+   # 3. For missing props: check if component signature changed
+   # 4. Build locally to verify: npm run build
+   ```
+
+#### **State Flow Diagram (Text Format):**
+```
+User Types Message
+    ↓
+handleChatSubmit() in RequesterModuleV2.tsx
+    ↓
+[Step 0] parseInitialRequest() → extracts metadata
+    ↓
+performSearch() → finds catalog items or creates free-text
+    ↓
+[Step 1] User selects items → handleAddItem() → updates draft.lineItems
+    ↓
+handleStep1Next() → determineRequestType() → sets draft.requestType
+    ↓
+[Step 2] Step2Container renders based on requestType
+    - User fills form → onUpdate() → updates draft.purchaseInfo
+    - User uploads files → handleFileUpload() → updates draft.uploadedFiles
+    - User selects contract → handleSelectContract() → updates draft.selectedContract
+    ↓
+[Step 3] Step3Summary displays all draft data
+    ↓
+[Step 4] Validation runs → generates draft.validationIssues
+    ↓
+[Step 5] Approval path shown → handleSubmit() → marks as SUBMITTED
+```
+
+#### **Critical Files You'll Modify Often:**
+| File | Purpose | When to Edit |
+|------|---------|-------------|
+| `RequesterModuleV2.tsx` | Main orchestrator | Adding chat logic, state management, step handlers |
+| `Step2Container.tsx` | Dynamic Step 2 forms | Adding fields, changing validation, new variants |
+| `workflow.ts` | Type definitions | Adding new fields to interfaces |
+| `Step3Summary.tsx` | Review screen | Displaying new fields in summary |
+| `catalogData.ts` | Mock catalog | Adding test items |
+
+#### **How to Test Your Changes:**
+```bash
+# 1. Start dev server
+npm run dev
+
+# 2. Test workflow end-to-end:
+# - Type: "Need desks by May 20 to Munich office"
+# - Check: Date and location pre-filled in Step 2?
+# - Step 1: Select catalog items
+# - Step 2: Verify form shows correct variant
+# - Step 3: Check summary displays all data
+# - Complete workflow
+
+# 3. Test chat co-pilot:
+# - In Step 2, type: "Deliver to Berlin office"
+# - Check: deliverToLocation field updates?
+
+# 4. Build check:
+npm run build
+# Must pass with no errors
+```
+
+#### **Package.json Key Dependencies (Why They're Used):**
+```json
+{
+  "react": "^18.3.1",           // UI framework
+  "react-dom": "^18.3.1",       // React rendering
+  "typescript": "~5.6.2",       // Type safety
+  "vite": "^7.3.0",             // Fast build tool with HMR
+  "tailwindcss": "^3.4.17",     // Utility-first CSS
+  "lucide-react": "^0.468.0",   // Icon library (Check, X, Upload, etc.)
+  "clsx": "^2.1.1",             // Conditional classNames
+  "tailwind-merge": "^2.6.0"    // Merge Tailwind classes safely
+}
+```
+
+#### **When User Asks: "Continue from where we left off"**
+
+**Your Response Template:**
+```
+"I've reviewed the DEVELOPMENT_LOG.md. Current state:
+
+✅ Project: PR2PO Prototype - Purchase workflow with AI chat
+✅ Version: v1.0 - Full Step 2 implementation with CLM integration
+✅ Last completed: Phase 10 - Step 3 Summary enhancements
+✅ Build status: Passing (TypeScript + Vite)
+✅ Key files: RequesterModuleV2.tsx (orchestrator), Step2Container.tsx (dynamic forms)
+
+What would you like to work on next? I can:
+1. Add new features to existing steps
+2. Enhance chat parsing logic
+3. Add validation rules
+4. Debug issues
+5. Refactor or optimize code
+
+Please describe what you'd like to accomplish."
+```
+
+---
 
 ## Project Architecture
 
@@ -518,6 +700,137 @@ VITE_API_URL=https://api.example.com
 VITE_CLM_API_URL=https://clm.example.com
 VITE_AUTH_DOMAIN=auth.example.com
 ```
+
+## UI Behavior & User Experience (For AI Understanding)
+
+### What User Sees at Each Step
+
+#### **Step 0: Initial Chat (Welcome Screen)**
+**Visual:**
+- Large chat interface on right side (60% width)
+- Sidebar on left with module tabs (Requester, Procurement, Overview, Settings)
+- Welcome message: "Welcome to the Procurement Assistant. What would you like to buy?"
+- Chat input at bottom: "Type your message..."
+
+**User Action:** Types message like "Need desks by May 20 to Munich office"
+
+**System Response:**
+- Shows user message bubble (blue background, right-aligned)
+- Shows assistant parsing confirmation: "✓ Got it! Searching for 'desks'... I've captured: date: 2025-05-20, location: Munich"
+- Shows "Let me check our catalogs..." message
+- Displays catalog results or "No catalog match found"
+
+#### **Step 1: Choose Items**
+**Visual:**
+- Stepper at top showing: ① Choose items → 2 Purchase info → 3 Summary → 4 Validation → 5 Approvals
+- Page title: "Choose items from catalog"
+- Grid of catalog item cards (2 columns on desktop)
+- Each card shows: thumbnail icon, name, description, specs, supplier badge (Preferred/Standard), price, lead time
+- Filter controls: "Preferred suppliers only" checkbox, Sort dropdown (Price: Low to High, etc.)
+- Quantity controls on each card: [-] [1] [+] buttons, "Add to Request" button
+- Bottom section: "My Request (X)" with selected items shown as blue boxes, total price, "Next: Purchase Information" button
+
+**User Action:** Clicks quantity buttons, clicks "Add to Request" on desired items
+
+**System Response:**
+- Selected items move to bottom "My Request" section
+- Can adjust quantity or remove from bottom section
+- "Next" button becomes enabled when at least one item selected
+
+#### **Step 2: Purchase Information (Dynamic Form)**
+**Visual Varies by Request Type:**
+
+**2A (Catalog Goods):**
+- Title: "Quick Checkout"
+- Section 1: Delivery & Recipient (3 fields: Deliver to, Location, Need by date) - **Pre-filled from Step 0 chat!**
+- Section 2: Business Context (Textarea: "What is this for?", Optional checkbox + input: "Part of a project")
+- Section 3: Conditional warning (amber box if >$10k): "Orders over $10,000 require supporting documentation"
+- Upload area (dashed border): "Click to upload or drag and drop"
+- Blue info box (if <$10k): "No additional documents required. Technical fields will be derived automatically."
+- Navigation: "Back to Items" | "Next: Review Summary" (disabled until required fields filled)
+
+**2B (Free-Text Goods):**
+- Title: "Free Text Item Details"
+- Section 1: Usage & Context (required textarea)
+- Section 2: Specification Refinement (optional inputs for brand/model/specs)
+- Section 3: Supplier Preference
+  - IF supplier mentioned in Step 1: Blue banner "You mentioned 'Accenture' as preferred supplier" + "Change" button
+  - IF NOT mentioned: Gray box "I'll let procurement pick" + optional input
+- Section 4: Attachments (encouraged)
+- Section 5: Delivery & Recipient - **Pre-filled!**
+
+**2C (Services):**
+- Title: "Service Request Details"
+- 7 sections: Scope, Timing, Justification, Delivery Model, Risk Assessment, Service Owner, Documents & Contracts
+- **Documents & Contracts section:**
+  - Upload area (same as 2A/2B)
+  - Uploaded files list (shows filename, size, "X" to remove)
+  - "Existing Contracts (from CLM)" heading with purple "Source: CLM" badge
+  - 3 contract cards with radio buttons:
+    - Each card shows: contract name, status badge (Active/Expiring Soon), supplier, contract ID, category, region, validity dates, relevance hint
+    - Selected contract: blue border, blue background, checkmark icon
+  - Green confirmation box when selected: "✓ Contract selected. This request will be treated as a call-off under [name]."
+
+**User Action:** Fills form fields, uploads files, selects contract (for services)
+
+**Chat Interaction:** User can type "Deliver to Berlin" and field updates automatically with confirmation message
+
+#### **Step 3: Review Summary**
+**Visual:**
+- Title: "Summary & Confirmation"
+- Section 1: Purchase Information (grid view: Usage, Deliver to, Need by, Project)
+- Section 2 (if contract selected): Green-bordered "Linked Contract" box with contract details + "CLM" badge
+- Section 3 (if files uploaded): "Attached Documents (X)" list with file names and sizes
+- Section 4: Items list (each item shows: name, description, supplier, quantity × price = total)
+- Section 5: Total value at bottom
+- Navigation: "Back to Purchase Info" | "Run Validation" button
+
+**User Action:** Reviews all data, clicks "Run Validation"
+
+#### **Step 4: Validation**
+**Visual:**
+- Title: "Validation & Policy Check"
+- Section 1: Validation results
+  - Green success box: "Good news! Your request passes all policy checks."
+  - OR Red/amber warning boxes: "Issue: Orders over $50,000 require quote attachment" with "Fix" button
+- Section 2: Policy compliance checks shown as green checkmarks or red warnings
+- Navigation: "Back to Summary" | "View Approval Path" (disabled if errors exist)
+
+**User Action:** Fixes any issues, clicks "View Approval Path"
+
+#### **Step 5: Approvals**
+**Visual:**
+- Title: "Approval Path"
+- Approval chain shown as connected boxes:
+  - Each box shows: Role, Approver name, Status badge (Pending/Approved)
+  - Boxes connected with lines showing flow
+- Estimated timeline: "Expected approval time: 2-3 business days"
+- Submit button: Green, large, "Submit Purchase Request"
+
+**User Action:** Reviews approval path, clicks "Submit"
+
+**Final State:**
+- Success message: "PR-[ID] submitted successfully!"
+- Option to create another request or view in "My PRs"
+
+### Chat Behavior Throughout Workflow
+
+**Always Available (Right Side):**
+- Chat input remains active at all steps
+- User can ask: "help", "status", "where am i", "Is there an existing contract?"
+- System responds with context-aware help
+
+**Step-Specific Responses:**
+- Step 0: Search and intent detection
+- Step 1: Item selection guidance
+- Step 2: Form field updates via natural language
+- Step 3-5: Status and help responses
+
+**Visual Feedback:**
+- User messages: Blue bubble, right-aligned
+- Assistant messages: Gray bubble, left-aligned
+- Confirmation messages: Include checkmark ✓ icon
+- Error messages: Include warning ⚠ icon
 
 ## Contact & Continuation
 

@@ -2,23 +2,70 @@
 
 An AI-powered procurement workflow system with intelligent chat interface, built with React, TypeScript, and Tailwind CSS.
 
+> **📖 For AI Assistants:** This README provides a quick overview. For complete development context and detailed implementation history, see **[DEVELOPMENT_LOG.md](./DEVELOPMENT_LOG.md)** - it contains everything an AI needs to continue development seamlessly.
+
+---
+
+## 🤖 AI Context Quick Start (Claude Code / Copilot / Cursor)
+
+**If you're an AI assistant, read this first:**
+
+1. **Full Context Location:** [DEVELOPMENT_LOG.md](./DEVELOPMENT_LOG.md) - Read the "FOR AI ASSISTANTS" section
+2. **Current State:** v1.0 - All features working, build passing, deployed on Vercel
+3. **Entry Point:** `src/modules/Requester/RequesterModuleV2.tsx` - Main workflow orchestrator
+4. **Key Concept:** 5-step workflow with smart chat that parses natural language and auto-fills forms
+
+**Quick Context Prompt for Continuing Work:**
+```
+"I'm continuing the PR2PO Prototype. I've read DEVELOPMENT_LOG.md.
+Current state: v1.0 with 5-step workflow, smart chat, CLM integration.
+Key files: RequesterModuleV2.tsx (orchestrator), Step2Container.tsx (dynamic forms).
+Build status: Passing. Let's work on [describe your task]."
+```
+
+---
+
 ## 🚀 Quick Start
 
+### Prerequisites
+- **Node.js:** Version 18.x or 20.x (check with `node --version`)
+- **npm:** Version 9+ (check with `npm --version`)
+- **Git:** For cloning and version control
+- **Operating System:** Windows, macOS, or Linux
+- **Internet Connection:** Required for npm install and Vercel deployment
+
+### Installation & Setup
+
 ```bash
-# Clone the repository
+# 1. Clone the repository
 git clone https://github.com/GabrielChitic/PR2POPrototype.git
 cd PR2POPrototype
 
-# Install dependencies
+# 2. Verify Node version (must be 18+ or 20+)
+node --version
+# If wrong version, install from nodejs.org or use nvm
+
+# 3. Install dependencies (takes 1-2 minutes)
 npm install
 
-# Start development server
+# 4. Start development server
 npm run dev
-# Opens at http://localhost:5173 (or next available port)
+# Output: "Local: http://localhost:5173/"
+# Opens at http://localhost:5173 (or next available port like 5174)
 
-# Build for production
+# 5. Build for production (verify everything works)
 npm run build
+# Must complete with no errors
 ```
+
+### First-Time Setup Checklist
+- [ ] Node 18+ or 20+ installed
+- [ ] Git installed and configured
+- [ ] Repository cloned successfully
+- [ ] `npm install` completed without errors
+- [ ] `npm run dev` starts server and opens in browser
+- [ ] `npm run build` completes successfully
+- [ ] Read [DEVELOPMENT_LOG.md](./DEVELOPMENT_LOG.md) for full context
 
 ## ✨ Features
 
@@ -145,16 +192,48 @@ Next task: [what you want to implement]"
 ## 🚢 Deployment
 
 **Repository:** https://github.com/GabrielChitic/PR2POPrototype.git
+**Deployment Platform:** Vercel
+**Deployment Method:** Auto-deploy on push to `main` branch
 
-The app auto-deploys to Vercel on every push to `main` branch.
+### Vercel Configuration
+
+**Framework Preset:** Vite
+**Build Command:** `npm run build`
+**Output Directory:** `dist`
+**Install Command:** `npm install`
+**Node Version:** 18.x (set in Vercel dashboard or via `.nvmrc`)
+
+The app auto-deploys to Vercel on every push to `main` branch. Vercel automatically:
+1. Detects the push to GitHub
+2. Runs `npm install`
+3. Runs `npm run build` (TypeScript compile + Vite build)
+4. Deploys the `dist` folder to production
 
 ### Manual Deployment
 ```bash
+# 1. Make your changes
 git add .
-git commit -m "Your commit message"
+git commit -m "feat: your feature description"
+
+# 2. Push to main (triggers auto-deploy)
 git push origin main
-# Vercel automatically detects and deploys
+
+# 3. Check Vercel dashboard for deployment status
+# Usually takes 1-2 minutes to build and deploy
 ```
+
+### Deployment Status Checks
+- **Vercel Dashboard:** Check build logs and deployment status
+- **GitHub:** Vercel bot comments on commits with deploy preview URL
+- **Build Errors:** Check Vercel logs for TypeScript or build errors
+
+### Environment Variables (if needed in future)
+Add in Vercel dashboard under Settings → Environment Variables:
+```
+VITE_API_URL=https://api.example.com
+VITE_CLM_API_URL=https://clm.example.com
+```
+(Currently not needed - all data is mock/client-side)
 
 ## 🧪 Key Implementation Details
 
