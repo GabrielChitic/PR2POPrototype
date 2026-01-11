@@ -158,7 +158,7 @@ export function Step1ChooseItems({
 
                 <div className="flex items-center gap-2">
                   <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                  <Select value={sortBy} onValueChange={(value) => setSortBy(value as any)}>
+                  <Select value={sortBy} onValueChange={(value: string) => setSortBy(value as any)}>
                     <SelectTrigger className="w-[200px]">
                       <SelectValue />
                     </SelectTrigger>
@@ -321,7 +321,7 @@ export function Step1ChooseItems({
                               variant="link"
                               size="sm"
                               className="h-auto p-0 text-xs"
-                              onClick={(e) => e.preventDefault()}
+                              onClick={(e: React.MouseEvent<HTMLButtonElement>) => e.preventDefault()}
                             >
                               View details →
                             </Button>
@@ -414,7 +414,7 @@ export function Step1ChooseItems({
                   <Input
                     id="item-name"
                     value={freeTextForm.itemName}
-                    onChange={(e) => setFreeTextForm(prev => ({ ...prev, itemName: e.target.value }))}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFreeTextForm(prev => ({ ...prev, itemName: e.target.value }))}
                     placeholder="e.g., Consulting services for SAP rollout"
                     required
                   />
@@ -445,7 +445,7 @@ export function Step1ChooseItems({
                       id="estimated-budget"
                       type="number"
                       value={freeTextForm.estimatedValue || ""}
-                      onChange={(e) => setFreeTextForm(prev => ({ ...prev, estimatedValue: parseFloat(e.target.value) }))}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFreeTextForm(prev => ({ ...prev, estimatedValue: parseFloat(e.target.value) }))}
                       placeholder="0.00"
                       required
                     />
@@ -454,7 +454,7 @@ export function Step1ChooseItems({
                     <Label htmlFor="currency">Currency</Label>
                     <Select
                       value={freeTextForm.currency}
-                      onValueChange={(value) => setFreeTextForm(prev => ({ ...prev, currency: value }))}
+                      onValueChange={(value: string) => setFreeTextForm(prev => ({ ...prev, currency: value }))}
                     >
                       <SelectTrigger id="currency">
                         <SelectValue />

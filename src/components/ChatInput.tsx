@@ -23,7 +23,7 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
     <form onSubmit={handleSubmit} className="flex gap-2 items-center">
       <Input
         value={message}
-        onChange={(e) => setMessage(e.target.value)}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMessage(e.target.value)}
         placeholder="Type your request... (e.g., 'I need 15 laptops for Bucharest')"
         disabled={disabled}
         className="flex-1"
