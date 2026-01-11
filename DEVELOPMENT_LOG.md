@@ -854,7 +854,448 @@ VITE_AUTH_DOMAIN=auth.example.com
 
 ---
 
-**Last Updated:** 2025-12-30
-**Current Version:** v1.0 (Full Step 2 implementation with CLM integration)
+## Phase 11: Module 1 - Golden Catalog Demo Pack
+**Date:** 2025-01-11
+**Goal:** Implement Module 1 features for killer demo: enhanced catalog, natural language parsing, chat shortcuts, no double-entry
+
+### Module 1 Features Implemented
+
+#### 1. Golden Catalog Dataset Upgrade
+**File:** `src/data/catalogData.ts`
+
+Upgraded from 3 to 5 laptops with full compliance metadata:
+
+1. **Dell Latitude 5430** - $1200, 5 days lead time, preferred supplier
+   - SKU: DELL-LAT-5430-I7-16-512
+   - Supplier ID: SUP-10001
+   - Contract: Dell Master Agreement valid until 2026
+   - Status: Allowed
+
+2. **HP EliteBook 840 G9** - $1350, 10 days lead time, non-preferred supplier
+   - SKU: HP-EB-840-G9-I7-16-512
+   - Supplier ID: SUP-10002
+   - Contract: Expired (2024)
+   - Status: Allowed (with warning)
+
+3. **Lenovo ThinkPad X1 Carbon** - $1400, 7 days lead time, preferred supplier
+   - SKU: LENOVO-X1-C10-I7-16-512
+   - Supplier ID: SUP-10003
+   - Contract: Valid until 2026
+   - **Status: BLOCKED** - "Not approved for contractor use per IT policy"
+   - This is the demo item for showing compliance blocking
+
+4. **Dell Latitude 3420** - $1100, 14 days lead time, preferred supplier (CHEAPEST)
+   - SKU: DELL-LAT-3420-I5-8-256
+   - Supplier ID: SUP-10001
+   - Contract: Dell Master Agreement
+   - Status: Allowed
+
+5. **Acer Aspire 5** - $950, 12 days lead time, non-preferred supplier
+   - SKU: ACER-ASP5-R5-8-256
+   - Supplier ID: SUP-10004
+   - No contract
+   - Status: Allowed
+
+**Key Features:**
+- Added `sku`, `supplierId` fields to all items
+- Added `compliance` object with: preferred, contractStatus, contractReason, allowed, blockedReason
+- Implemented deterministic sorting in `searchCatalog()` for consistent results
+
+#### 2. Natural Language Date Parsing
+**File:** `src/services/unifiedSearch.ts`
+
+**New Functions:**
+```typescript
+parseNaturalDate(phrase: string, baseDate?: Date): string
+extractAndParseDate(query: string): string | null
+extractLocation(query: string): string
+```
+
+**Supported Date Formats:**
+- Relative: "in a week" → +7 days, "in a month" → +30 days, "in X days" → +X days
+- Month names: "by April" → last day of April, "in May" → May 1st
+- Day of week: "next Friday" → upcoming Friday
+- Calendar: "Jan 5th", "5 January 2025", "2025-05-20"
+- Ordinal suffixes: "20th May", "5th of June"
+
+**Location Extraction:**
+Detects cities: Bucharest, New York, London, Paris, Munich, Prague, Berlin, Amsterdam, Madrid, Rome, Vienna, Warsaw, Copenhagen
+
+#### 3. Chat Shortcuts (Deterministic Behavior)
+**File:** `src/modules/Requester/RequesterModuleV2.tsx`
+
+**Function:** `handleStage1Shortcuts(message: string, messageLower: string): boolean`
+
+**Implemented Shortcuts:**
+
+1. **"cheapest"** - Selects lowest price allowed item
+   ```typescript
+   const allowed = catalogResults.filter(item => item.compliance.allowed);
+   const cheapest = allowed.reduce((min, item) =>
+     item.unitPrice < min.unitPrice ? item : min
+   );
+   ```
+
+2. **"fastest delivery"** - Selects shortest lead time item
+   ```typescript
+   const fastest = allowed.reduce((min, item) =>
+     (item.leadTimeDays || 999) < (min.leadTimeDays || 999) ? item : min
+   );
+   ```
+
+3. **"best offer"** - Deterministic scoring algorithm
+   ```typescript
+   score = 0;
+   if (item.compliance.preferred) score += 20;
+   score += (1 - item.unitPrice / maxPrice) * 30;  // Lower price = higher score
+   score += (1 - item.leadTimeDays / maxLead) * 20;  // Faster delivery = higher score
+   if (item.compliance.contractStatus === "valid") score += 15;
+   // Pick highest score (deterministic because same inputs → same outputs)
+   ```
+
+4. **"why is this blocked?"** - Explains compliance blocking
+   ```typescript
+   const blocked = catalogResults.find(item => !item.compliance.allowed);
+   if (blocked && blocked.compliance.blockedReason) {
+     addChatMessage("assistant", `${blocked.name} is blocked: ${blocked.compliance.blockedReason}`);
+   }
+   ```
+
+#### 4. Killer Demo Moment - Proactive Suggestions
+**Implementation:** After catalog search results appear, system proactively suggests shortcuts:
+
+```typescript
+// In handleChatSubmit after search completes:
+if (searchResult.matchedItems.length > 0) {
+  setCurrentStep(1);
+  addChatMessage("assistant",
+    `I found ${searchResult.matchedItems.length} matching items. ` +
+    `Want me to pick the cheapest, fastest delivery, or best offer?`
+  );
+}
+```
+
+User can then simply type "cheapest" and system auto-selects and adds to cart.
+
+#### 5. No Double-Entry - Quantity Inference
+**File:** `src/modules/Requester/RequesterModuleV2.tsx`
+
+**Function:** `inferQuantityFromMessage(message: string): number`
+
+**Enhanced Pattern Matching:**
+```typescript
+// Matches "15 laptops", "5 desks", "ten chairs" anywhere in message
+const quantityMatch = message.match(/\b(\d+)\s+(?:laptop|chair|monitor|desk|computer|pc|notebook|item|unit)/i);
+if (quantityMatch) return parseInt(quantityMatch[1], 10);
+
+// Written numbers: "five desks" → 5
+const writtenNumbers = { "one": 1, "two": 2, ..., "fifteen": 15, "twenty": 20 };
+```
+
+**Integration:** Quantity automatically applied in Step 1 when items added to cart:
+```typescript
+const qty = draft.inferredQuantity || 1;
+handleAddItem(selectedItem, qty);
+```
+
+#### 6. No Double-Entry - Date & Location Prefilling
+**File:** `src/modules/Requester/RequesterModuleV2.tsx`
+
+**Function:** `parseInitialRequest(message: string)`
+
+**Enhanced Logic:**
+```typescript
+const parsedDate = extractAndParseDate(message);
+if (parsedDate) {
+  metadata.purchaseInfo.needByDate = parsedDate;
+}
+
+const extractedLocation = extractLocation(message);
+if (extractedLocation) {
+  metadata.purchaseInfo.deliverToLocation = extractedLocation;
+}
+```
+
+**Result:** Step 2 form fields pre-populated from initial chat message. User types:
+```
+"I need 15 laptops for new contractors in Bucharest in a week"
+```
+
+System extracts and prefills:
+- Quantity: 15 (applied in Step 1)
+- Location: Bucharest (prefilled in Step 2)
+- Date: 2025-01-18 (7 days from now, prefilled in Step 2)
+
+#### 7. Workflow Stages 3-5 Implementation
+**Goal:** Complete the workflow with accounting, review, and approval tracking phases
+
+**Step 3: Accounting & Policy Checks**
+**File:** `src/components/workflow/Step3AccountingChecks.tsx`
+
+Features:
+- Accounting fields: Entity/Company Code (read-only), Commodity Group, GL Account, Cost Center
+- Select dropdowns with auto-assigned defaults
+- Info tooltips explaining auto-assignment logic
+- Validation status icons (check/warning/error) per field
+- Policy checks section with pass/warn/block status badges
+- "Re-run checks" button to refresh validation
+- Blocks progression if any field has "block" status
+
+**Step 4: Review & Submit**
+**File:** `src/components/workflow/Step4ReviewSubmit.tsx`
+
+Features:
+- Hero section with PR summary card (total value, item count, submit date)
+- Purchase details section (what, who, where, when)
+- Line items review with specs and totals
+- Accounting codes display (commodity, GL, cost center)
+- Linked contract display (if selected in Step 2C)
+- Attached documents list (if uploaded)
+- Policy checks summary with badges
+- Large "Submit Purchase Request" button
+- Confirmation flow
+
+**Step 5: Track & Approvals**
+**File:** `src/components/workflow/Step5TrackApprovals.tsx`
+
+Features:
+- **Two Views:**
+  1. **Single Request View (Tracking)** - When viewing specific PR
+     - Timeline with approval steps (pending/approved/rejected)
+     - Request details (collapsible accordion)
+     - Comments section
+     - Action buttons (edit, cancel, etc.)
+
+  2. **My Requests List View** - When accessing from landing page
+     - Searchable/filterable list of all user's PRs
+     - Status badges (Draft, Submitted, Approved, etc.)
+     - Quick stats (total value, submission date)
+     - Click to view details
+
+- **Navigation:**
+  - "My Requests" button on landing page → Opens Phase 5 in list mode
+  - Clicking a PR in list → Switches to tracking mode for that PR
+  - "Back to My Requests" → Returns to list mode
+
+**Step 5 Navigation Refinements:**
+- Landing page now has "My Requests" chip with count
+- Clicking chip navigates to Phase 5 in list view
+- App navigation updated: "New Request" → "Request Builder" tab
+- "New Request" button in top-right resets to landing page
+
+### Recent Commits
+```bash
+d1e6b96 - feat: Implement Module 1 with golden catalog demo and workflow stages 3-5
+  - Added 5 laptops with full compliance metadata
+  - Implemented natural language date/location parsing
+  - Added chat shortcuts (cheapest, fastest, best offer)
+  - Enhanced quantity inference
+  - Prefilling Stage 2 from chat
+  - Completed Step 3 (Accounting), Step 4 (Review), Step 5 (Approvals)
+  - My Requests navigation
+```
+
+### Testing the Golden Demo Flow
+**Canonical Test Case:**
+```
+Input: "I need 15 laptops for new contractors in Bucharest starting in April."
+
+Expected:
+✅ Extract: quantity=15, location="Bucharest", date="2025-04-30" (last day of April)
+✅ Search: Find 5 laptops (4 allowed, 1 blocked)
+✅ Suggest: "Want cheapest, fastest delivery, or best offer?"
+✅ User: "cheapest"
+✅ System: Auto-select Dell Latitude 3420 ($1100), qty 15, add to cart
+✅ Step 1→2: Date and location prefilled
+✅ User: "why is the lenovo blocked?"
+✅ System: "Lenovo ThinkPad X1 Carbon is blocked: Not approved for contractor use per IT policy"
+✅ Step 2→3→4→5: Complete workflow and submit
+```
+
+---
+
+## Phase 12: Vercel Deployment Fixes
+**Date:** 2025-01-11
+**Goal:** Resolve all TypeScript and module resolution errors preventing Vercel deployment
+
+### Issue Summary
+After pushing Module 1 code, Vercel deployment failed with 31 TypeScript errors:
+- 17 errors: Parameter 'e' implicitly has an 'any' type (TS7006)
+- 14 errors: Cannot find module '@/...' (TS2307)
+
+### Root Causes Identified
+
+1. **Missing Type Annotations**
+   - Event handlers missing explicit type annotations
+   - Vercel runs strict TypeScript compilation
+   - Local dev server more lenient
+
+2. **Path Alias Issues**
+   - `@/` path aliases not resolving in Vercel build environment
+   - Works locally due to tsconfig.json paths, but Vercel uses different resolution
+
+3. **Case Sensitivity Issues**
+   - macOS file system is case-insensitive
+   - Vercel Linux servers are case-sensitive
+   - Git tracked capitalized filenames (Button.tsx) but actual files were lowercase (button.tsx)
+
+### Fix Round 1: Type Annotations (Workflow Components)
+**Commits:** `ffca2b8`, `1ca6ade`
+
+**Files Fixed:**
+- `Step2Container.tsx` - 4 onChange handlers → Added `React.ChangeEvent<HTMLInputElement>`
+- `Step2PurchaseInfo.tsx` - 5 onChange handlers → Added explicit types
+- `Step3AccountingChecks.tsx` - 3 onValueChange handlers → Added `string` type
+- `Step5TrackApprovals.tsx` - 1 onChange handler → Added type annotation
+
+**Pattern:**
+```typescript
+// Before (implicit any):
+onChange={(e) => onUpdate({ deliverTo: e.target.value })}
+
+// After (explicit type):
+onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUpdate({ deliverTo: e.target.value })}
+```
+
+### Fix Round 2: Path Alias Resolution
+**Commit:** `ffca2b8`
+
+**Problem:** Imports like `import { Button } from '@/components/ui/button'` not resolving
+
+**Solution:** Convert all path aliases to relative imports
+```bash
+# Workflow files
+sed -i '' 's|from "@/components/ui/|from "../../components/ui/|g' src/components/workflow/*.tsx
+
+# Main components
+sed -i '' 's|from "@/components/ui/|from "./ui/|g' src/components/*.tsx
+
+# Modules
+sed -i '' 's|from "@/components/ui/|from "../../components/ui/|g' src/modules/**/*.tsx
+
+# Also fixed @/lib/, @/types/, @/data/ imports
+```
+
+**Files Updated:** 19 files changed to use relative imports
+
+### Fix Round 3: UI Component Imports
+**Commits:** `276ea10`, `cd16ae8`
+
+**Problem:** UI components themselves had `@/lib/utils` imports
+
+**Solution:** Fix all UI component internal imports
+```bash
+for file in src/components/ui/*.tsx; do
+  sed -i '' 's|from "@/lib/utils"|from "../../lib/utils"|g' "$file"
+done
+```
+
+**Files Fixed:** 20 UI components (button, card, input, select, badge, dialog, etc.)
+
+### Fix Round 4: More Type Annotations
+**Commit:** `276ea10`
+
+**Files Fixed:**
+- `ChatInput.tsx` line 26 - onChange handler
+- `Step1ChooseItems.tsx` lines 161, 324, 417, 448, 457 - 5 handlers (Input onChange, Select onValueChange, Button onClick)
+- `Step2Container.tsx` line 377 - missed onChange handler
+
+**Final Count:** All 31 TypeScript errors resolved
+
+### Fix Round 5: Case Sensitivity Crisis
+**Commit:** `f52af29`
+
+**Problem:** Even after fixing imports, errors persisted:
+```
+error TS2307: Cannot find module './ui/button' or its corresponding type declarations.
+```
+
+**Investigation:**
+```bash
+ls -la src/components/ui/
+# Actual files: button.tsx, card.tsx, input.tsx, select.tsx (lowercase)
+
+git ls-files src/components/ui/
+# Git tracking: Button.tsx, Card.tsx, Input.tsx, Select.tsx (capitalized)
+```
+
+**Root Cause:**
+- macOS file system is case-insensitive → both Button.tsx and button.tsx refer to same file
+- Git was tracking capitalized filenames
+- Vercel Linux servers are case-sensitive → couldn't find Button.tsx
+
+**Solution:**
+```bash
+# Remove capitalized files from Git
+git rm --cached src/components/ui/Button.tsx src/components/ui/Card.tsx \
+  src/components/ui/Input.tsx src/components/ui/Select.tsx
+
+# Add lowercase files
+git add src/components/ui/button.tsx src/components/ui/card.tsx \
+  src/components/ui/input.tsx src/components/ui/select.tsx
+
+# Git recognized as renames (100% match)
+```
+
+### Final Build Status
+```bash
+npm run build
+# ✓ built in 1.19s
+# Output: dist/ folder ready for deployment
+```
+
+### Deployment Success
+All commits pushed to GitHub → Vercel auto-deployed successfully
+
+### Lessons Learned
+
+1. **Always use explicit type annotations** for event handlers in React + TypeScript:
+   ```typescript
+   onChange={(e: React.ChangeEvent<HTMLInputElement>) => ...}
+   onValueChange={(value: string) => ...}
+   onClick={(e: React.MouseEvent<HTMLButtonElement>) => ...}
+   ```
+
+2. **Avoid path aliases in projects deployed to Linux servers** - Use relative imports:
+   ```typescript
+   // Bad (Vercel issues):
+   import { cn } from "@/lib/utils"
+
+   // Good (works everywhere):
+   import { cn } from "../../lib/utils"
+   ```
+
+3. **File naming consistency critical for cross-platform compatibility:**
+   - Use lowercase filenames for components (button.tsx not Button.tsx)
+   - React component names can still be PascalCase (export function Button)
+   - Git tracks actual filenames, not how they're referenced in code
+
+4. **Test builds locally before pushing:**
+   ```bash
+   npm run build  # Must pass with zero errors
+   ```
+
+### Commit History Summary
+```
+d1e6b96 - feat: Implement Module 1 with golden catalog demo and workflow stages 3-5
+ffca2b8 - fix: resolve Vercel deployment errors with type annotations and import paths
+1ca6ade - fix: correct import paths and add remaining type annotations
+276ea10 - fix: update ui component imports and add all missing type annotations
+cd16ae8 - fix: update remaining ui component imports (capitalized files)
+f52af29 - fix: resolve case sensitivity issue with ui components and add missing type annotation
+```
+
+---
+
+**Last Updated:** 2025-01-11
+**Current Version:** v1.2 (Module 1 complete + Vercel deployment fixes)
 **Build Status:** ✅ Passing (TypeScript + Vite)
-**Deployment Status:** ✅ Live on Vercel
+**Deployment Status:** ✅ Live on Vercel with all fixes applied
+
+**Recent Work Summary:**
+- ✅ Module 1: Golden catalog demo pack (5 laptops, natural language, chat shortcuts)
+- ✅ Workflow Stages 3-5: Accounting, Review & Submit, Track & Approvals
+- ✅ My Requests navigation
+- ✅ Vercel deployment fixes (type annotations, path aliases, case sensitivity)
+- ✅ All TypeScript errors resolved
+- ✅ Build passing consistently

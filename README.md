@@ -11,14 +11,15 @@ An AI-powered procurement workflow system with intelligent chat interface, built
 **If you're an AI assistant, read this first:**
 
 1. **Full Context Location:** [DEVELOPMENT_LOG.md](./DEVELOPMENT_LOG.md) - Read the "FOR AI ASSISTANTS" section
-2. **Current State:** v1.0 - All features working, build passing, deployed on Vercel
+2. **Current State:** v1.2 - Module 1 complete with golden catalog demo, all workflow stages, deployed on Vercel
 3. **Entry Point:** `src/modules/Requester/RequesterModuleV2.tsx` - Main workflow orchestrator
-4. **Key Concept:** 5-step workflow with smart chat that parses natural language and auto-fills forms
+4. **Key Concept:** 5-phase workflow (Phase 0 background + Phases 1-5) with smart chat that parses natural language and auto-fills forms
 
 **Quick Context Prompt for Continuing Work:**
 ```
 "I'm continuing the PR2PO Prototype. I've read DEVELOPMENT_LOG.md.
-Current state: v1.0 with 5-step workflow, smart chat, CLM integration.
+Current state: v1.2 with Module 1 features - golden catalog demo, natural language parsing,
+chat shortcuts, and complete workflow stages 1-5.
 Key files: RequesterModuleV2.tsx (orchestrator), Step2Container.tsx (dynamic forms).
 Build status: Passing. Let's work on [describe your task]."
 ```
@@ -69,15 +70,32 @@ npm run build
 
 ## ✨ Features
 
+### Module 1: Golden Catalog Demo Pack
+- **Enhanced Catalog** - 5 laptops with full compliance metadata, SKUs, supplier IDs
+- **Natural Language Date Parsing** - "in a week", "by April", "next Friday" auto-converts to dates
+- **Location Extraction** - "Bucharest", "New York", "Munich" auto-fills location fields
+- **Chat Shortcuts** - "cheapest", "fastest delivery", "best offer", "why is this blocked?"
+- **Killer Demo Moments** - Proactive suggestions after search results
+- **No Double-Entry** - Quantity, location, date extracted from initial message and prefilled
+- **Blocked Item Demo** - Lenovo ThinkPad blocked for contractors (compliance demo)
+
 ### Smart Chat Interface
-- **Natural Language Parsing** - "Need desks by May 20 to Munich office" automatically extracts dates, locations, and context
+- **Natural Language Parsing** - "15 laptops for new contractors in Bucharest by April" extracts all metadata
 - **Context-Aware Co-Pilot** - Chat assists with form filling throughout the workflow
 - **Intent Detection** - Recognizes goods, services, or free-text requests
-- **Command Support** - Help, status, restart commands
+- **Command Support** - Help, status, restart, why blocked commands
+- **Chat Shortcuts** - Deterministic "cheapest", "fastest", "best offer" selection
+
+### Complete 5-Phase Workflow
+- **Phase 0: Background Processing** - Parse user intent, extract metadata (invisible to user)
+- **Phase 1: Shop & Select** - Choose catalog items, adjust quantities, add free-text items
+- **Phase 2: Delivery & Details** - 3 dynamic variants (catalog/free-text/services) with prefilled data
+- **Phase 3: Accounting & Policy Checks** - Commodity groups, GL accounts, cost centers, policy validation
+- **Phase 4: Review & Submit** - Comprehensive summary with linked contracts and attachments
+- **Phase 5: Track & Approvals** - Timeline view, My Requests tab, approval tracking
 
 ### Dynamic Workflow
-- **5-Step Process** - Choose Items → Purchase Info → Review → Validation → Approvals
-- **3 Request Types** with adaptive Step 2 forms:
+- **3 Request Types** with adaptive Phase 2 forms:
   - **Catalog Goods** - Quick checkout for catalog items
   - **Free-Text Goods** - Custom item requests
   - **Services** - Comprehensive service procurement
@@ -97,8 +115,8 @@ npm run build
 ```
 src/
 ├── components/
-│   ├── ui/              # Reusable UI components (Button, Input, Card, StatusPill)
-│   └── workflow/        # Workflow step components (Step1-5, Stepper)
+│   ├── ui/              # Reusable UI components (button, input, card, etc.)
+│   └── workflow/        # Workflow phase components (Step1-5, Stepper, MyRequestsView)
 ├── modules/
 │   ├── Requester/       # Main workflow module (RequesterModuleV2)
 │   ├── Procurement/     # Procurement team view
@@ -106,7 +124,7 @@ src/
 │   └── Settings/        # Settings
 ├── context/             # Global state management (PRContext)
 ├── services/            # Search and API services (unifiedSearch)
-├── data/                # Mock data (catalog items, contracts)
+├── data/                # Mock data (catalogData, accountingData, contractsData)
 └── types/               # TypeScript definitions (workflow types)
 ```
 
@@ -114,29 +132,37 @@ src/
 
 For complete development history, architecture details, and continuation instructions, see:
 - **[DEVELOPMENT_LOG.md](./DEVELOPMENT_LOG.md)** - Comprehensive development documentation with full conversation history
-- **[STYLE_GUIDE.md](./STYLE_GUIDE.md)** - UI/UX style guidelines
+- **Module 1 Features** - Detailed in Development Log Phase 11
 
 ## 🎯 Example Workflows
 
-### Catalog Goods
+### Golden Demo: Catalog Goods with Chat Shortcuts
 ```
-1. Chat: "Need 5 desks by May 20 to Munich office"
-2. System: Searches catalog, extracts date & location
-3. Step 1: Select items and quantities
-4. Step 2: Quick checkout form (pre-filled)
-5. Review & Submit
+1. Chat: "I need 15 laptops for new contractors in Bucharest in a week"
+2. System:
+   - Extracts: quantity=15, location="Bucharest", timeframe="in a week"
+   - Searches catalog
+   - Shows 4 allowed laptops + 1 blocked (Lenovo ThinkPad - blocked for contractors)
+   - Suggests: "Want cheapest, fastest delivery, or best offer?"
+3. User: "cheapest"
+4. System: Auto-selects Dell Latitude 3420 ($1100), quantity 15, adds to cart
+5. Phase 2: Form prefilled with Bucharest, need-by date (1 week from now)
+6. User: "why is the Lenovo blocked?"
+7. System: "Lenovo ThinkPad X1 Carbon is blocked: Not approved for contractor use per IT policy"
+8. Continue to Phase 3-5 and submit
 ```
 
 ### Services with Contract
 ```
 1. Chat: "SAP consulting services"
-2. Step 1: Add service item
-3. Step 2: Fill scope, timing, risks
+2. Phase 1: Add service item
+3. Phase 2: Fill scope, timing, risks
    - CLM shows 3 matching contracts
    - Select "IT Services Framework - Accenture"
    - Upload Statement of Work
-4. Review: Shows linked contract
-5. Submit
+4. Phase 3: Shows linked contract
+5. Phase 4: Review & Submit
+6. Phase 5: Track approvals
 ```
 
 ### Free-Text Item
@@ -144,7 +170,7 @@ For complete development history, architecture details, and continuation instruc
 1. Chat: "Custom signage for Berlin office"
 2. No catalog match → Free text form
 3. Fill: item details, budget, supplier
-4. Step 2: Clarify business need, add specs
+4. Phase 2: Clarify business need, add specs, prefilled location="Berlin"
 5. Upload quote
 6. Review & Submit
 ```
@@ -154,6 +180,7 @@ For complete development history, architecture details, and continuation instruc
 - **Frontend:** React 18 + TypeScript
 - **Build Tool:** Vite 7
 - **Styling:** Tailwind CSS
+- **UI Components:** shadcn/ui (button, card, input, select, etc.)
 - **Icons:** Lucide React
 - **Deployment:** Vercel (auto-deploy from main)
 
@@ -169,31 +196,36 @@ npm run lint     # Run ESLint (if configured)
 ## 🔄 Continuing Development
 
 ### From Any Machine:
-1. **Clone** the repository
-2. **Read** [DEVELOPMENT_LOG.md](./DEVELOPMENT_LOG.md) for full context
-3. **Install** dependencies: `npm install`
-4. **Start** dev server: `npm run dev`
-5. **Reference** the log when starting a new Claude Code session
+1. **Clone** the repository: `git clone https://github.com/GabrielChitic/PR2POPrototype.git`
+2. **Navigate** to directory: `cd PR2POPrototype`
+3. **Read** [DEVELOPMENT_LOG.md](./DEVELOPMENT_LOG.md) for full context (CRITICAL - contains all implementation details)
+4. **Install** dependencies: `npm install`
+5. **Start** dev server: `npm run dev`
+6. **Test** build: `npm run build` (must pass with no errors)
+7. **Reference** the log when starting a new Claude Code session
 
 ### Key Context to Share with Claude:
 ```
 "I'm continuing the PR2PO Prototype project.
-Current state: [describe what you're working on]
-Last completed: [reference DEVELOPMENT_LOG.md sections]
+Current state: v1.2 - Module 1 complete with golden catalog demo
+Last completed: [reference DEVELOPMENT_LOG.md Phase 11-12]
 Next task: [what you want to implement]"
 ```
 
 ### Important Files:
-- `DEVELOPMENT_LOG.md` - Full implementation history
+- `DEVELOPMENT_LOG.md` - **READ THIS FIRST** - Full implementation history with Module 1 details
 - `src/types/workflow.ts` - Core type definitions
-- `src/modules/Requester/RequesterModuleV2.tsx` - Main orchestrator (800+ lines)
-- `src/components/workflow/Step2Container.tsx` - Dynamic Step 2 (1000+ lines)
+- `src/modules/Requester/RequesterModuleV2.tsx` - Main orchestrator (1000+ lines)
+- `src/components/workflow/Step2Container.tsx` - Dynamic Phase 2 (1000+ lines)
+- `src/data/catalogData.ts` - Golden catalog with 5 laptops
+- `src/services/unifiedSearch.ts` - Natural language parsing logic
 
 ## 🚢 Deployment
 
 **Repository:** https://github.com/GabrielChitic/PR2POPrototype.git
 **Deployment Platform:** Vercel
 **Deployment Method:** Auto-deploy on push to `main` branch
+**Live URL:** [Check Vercel dashboard for URL]
 
 ### Vercel Configuration
 
@@ -201,7 +233,12 @@ Next task: [what you want to implement]"
 **Build Command:** `npm run build`
 **Output Directory:** `dist`
 **Install Command:** `npm install`
-**Node Version:** 18.x (set in Vercel dashboard or via `.nvmrc`)
+**Node Version:** 18.x (set in Vercel dashboard)
+
+### Important Deployment Notes
+- **Case-Sensitive Imports:** UI components use lowercase filenames (button.tsx, not Button.tsx) for Linux compatibility
+- **No Path Aliases:** All imports use relative paths (../../lib/utils) not path aliases (@/) for Vercel compatibility
+- **Type Annotations:** All event handlers have explicit type annotations (React.ChangeEvent<HTMLInputElement>)
 
 The app auto-deploys to Vercel on every push to `main` branch. Vercel automatically:
 1. Detects the push to GitHub
@@ -222,20 +259,35 @@ git push origin main
 # Usually takes 1-2 minutes to build and deploy
 ```
 
-### Deployment Status Checks
-- **Vercel Dashboard:** Check build logs and deployment status
-- **GitHub:** Vercel bot comments on commits with deploy preview URL
-- **Build Errors:** Check Vercel logs for TypeScript or build errors
-
-### Environment Variables (if needed in future)
-Add in Vercel dashboard under Settings → Environment Variables:
-```
-VITE_API_URL=https://api.example.com
-VITE_CLM_API_URL=https://clm.example.com
-```
-(Currently not needed - all data is mock/client-side)
+### Deployment Troubleshooting
+See [DEVELOPMENT_LOG.md](./DEVELOPMENT_LOG.md) Phase 12 for complete Vercel deployment fix history:
+- TypeScript implicit 'any' type errors
+- Module resolution errors with path aliases
+- Case sensitivity issues with component filenames
 
 ## 🧪 Key Implementation Details
+
+### Golden Catalog Dataset
+5 laptops with full metadata:
+1. **Dell Latitude 5430** - $1200, 5 days, preferred
+2. **HP EliteBook 840 G9** - $1350, 10 days, non-preferred
+3. **Lenovo ThinkPad X1 Carbon** - $1400, 7 days, **BLOCKED** (contractor policy)
+4. **Dell Latitude 3420** - $1100, 14 days, preferred (cheapest)
+5. **Acer Aspire 5** - $950, 12 days, non-preferred
+
+Each includes: SKU, supplier ID, contract status, compliance flags, blocked reasons
+
+### Natural Language Processing
+- **Date Parsing:** "in a week" → +7 days, "by April" → last day of April, "next Friday" → upcoming Friday
+- **Location Extraction:** Detects cities: Bucharest, New York, London, Paris, Munich, Prague, etc.
+- **Quantity Inference:** "15 laptops" → quantity 15, "five desks" → quantity 5
+- **Context Extraction:** Parses usage, projects, recipients from free-form text
+
+### Chat Shortcuts (Deterministic)
+- **"cheapest"** → Selects lowest price allowed item
+- **"fastest delivery"** → Selects shortest lead time item
+- **"best offer"** → Deterministic scoring: preferred supplier (20pts) + low price (30pts) + fast delivery (20pts) + valid contract (15pts)
+- **"why is this blocked?"** → Explains compliance blocking reason
 
 ### Request Type Detection
 The system automatically determines request type based on line items:
@@ -243,30 +295,33 @@ The system automatically determines request type based on line items:
 - **freeTextGoods** - Has free-text items (no catalog match)
 - **servicesOrComplex** - Contains service items (detected by keywords: consulting, training, audit, etc.)
 
-### Step 2 Variant Switching
+### Phase 2 Variant Switching
 Single `Step2Container` component with 3 variants:
 - **2A (Catalog)** - Minimal friction: delivery, recipient, usage, optional attachments
 - **2B (Free-text)** - Clarify need: usage, specs, supplier preference, required attachments
 - **2C (Services)** - Comprehensive: scope, timing, justification, delivery model, risks, CLM contracts
 
 ### Chat Intelligence
-- **Initial parsing:** Extracts dates ("20th May"), locations ("Munich office"), projects ("Project Phoenix")
-- **Step 2 co-pilot:** Updates form fields via natural language ("deliver to Berlin", "need by May 20")
+- **Initial parsing:** Extracts dates ("in a week"), locations ("Bucharest"), quantities ("15 laptops")
+- **Phase 2 co-pilot:** Updates form fields via natural language ("deliver to Berlin", "need by May 20")
 - **Contract queries:** "Is there an existing contract?" → Lists CLM contracts with details
+- **Proactive suggestions:** After search: "Want cheapest, fastest delivery, or best offer?"
 
 ### CLM Contract Simulation
-Generates 3 mock contracts on Step 2C:
+Generates 3 mock contracts in Phase 2C (Services):
 1. Accenture - IT Services Framework (valid until 2027)
 2. Deloitte - Professional Services MSA (valid until 2026)
 3. PwC - Consulting Framework (expiring 2025)
 
-Selection stored in `draft.selectedContract` and displayed in Step 3 summary.
+Selection stored in `draft.selectedContract` and displayed in Phase 4 summary.
 
 ## 🐛 Troubleshooting
 
 ### Build Errors
 - Run `npm run build` to check for TypeScript errors
 - Common: TS6133 (unused variables) - prefix with `_` or remove
+- Common: TS7006 (implicit 'any' type) - add explicit type annotations
+- Common: TS2307 (module not found) - check relative import paths
 
 ### Dev Server Issues
 - Port 5173 in use? Vite auto-assigns next available port
@@ -277,16 +332,31 @@ Selection stored in `draft.selectedContract` and displayed in Step 3 summary.
 - Pull latest: `git pull origin main`
 - Push fails? Check network and credentials
 
+### Vercel Deployment Fails
+See [DEVELOPMENT_LOG.md](./DEVELOPMENT_LOG.md) Phase 12 for complete fix history:
+1. Check Vercel build logs for specific error
+2. Verify `npm run build` passes locally
+3. Ensure all imports use relative paths (no `@/` aliases)
+4. Verify UI component filenames are lowercase (button.tsx not Button.tsx)
+5. Check all event handlers have explicit type annotations
+
 ## 📊 Project Status
 
-**Current Version:** v1.0 - Full Step 2 implementation with CLM integration
+**Current Version:** v1.2 - Module 1 complete with golden catalog demo and all workflow phases
 **Build Status:** ✅ Passing (TypeScript + Vite)
-**Last Updated:** 2025-12-30
-**Total Lines:** ~4,800 insertions across 26 files
+**Last Updated:** 2025-01-11
+**Recent Features:**
+- Golden catalog demo pack with 5 laptops
+- Natural language date/location parsing
+- Chat shortcuts (cheapest, fastest, best offer)
+- Complete workflow Phases 3-5
+- My Requests tab in Phase 5
+- Vercel deployment fixes (type annotations, path aliases, case sensitivity)
 
 ## 🗺️ Next Steps (Potential)
 
 See [DEVELOPMENT_LOG.md](./DEVELOPMENT_LOG.md) for detailed future work suggestions:
+- Module 2: Pane visibility and Phase 0 background processing
 - Backend API integration
 - Real CLM connection
 - Authentication & authorization
@@ -306,3 +376,4 @@ Gabriel Chitic - gabriel.chitic@uipath.com
 
 **Repository:** https://github.com/GabrielChitic/PR2POPrototype.git
 **Documentation:** See [DEVELOPMENT_LOG.md](./DEVELOPMENT_LOG.md) for complete history
+**Deployment:** Auto-deploys to Vercel from `main` branch
