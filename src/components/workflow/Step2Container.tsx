@@ -374,7 +374,7 @@ export function Step2Container({ draft, onUpdate, onNext, onBack, onUpdateDraft 
                         <Input
                           className="mt-2"
                           value={purchaseInfo.projectName || ""}
-                          onChange={(e) => onUpdate({ projectName: e.target.value })}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUpdate({ projectName: e.target.value })}
                           placeholder="Project name or cost center code"
                         />
                       )}
