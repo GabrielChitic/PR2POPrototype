@@ -1,12 +1,12 @@
 import { Shield, CheckCircle, AlertTriangle, XCircle, Info, RefreshCw } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Separator } from "@/components/ui/separator";
-import type { DraftPR, CheckStatus } from "@/types/workflow";
-import { COMMODITY_GROUPS, GL_ACCOUNTS, COST_CENTERS } from "@/data/accountingData";
+import { Button } from "../../components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import { Badge } from "../../components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../components/ui/tooltip";
+import { Separator } from "../../components/ui/separator";
+import type { DraftPR, CheckStatus } from "../../types/workflow";
+import { COMMODITY_GROUPS, GL_ACCOUNTS, COST_CENTERS } from "../../data/accountingData";
 
 interface Step3Props {
   draft: DraftPR;
@@ -127,7 +127,7 @@ export function Step3AccountingChecks({ draft, onUpdate, onNext, onBack, onRunCh
                   <div className="flex items-center gap-2">
                     <Select
                       value={draft.commodityGroupId || ""}
-                      onValueChange={(value) => {
+                      onValueChange={(value: string) => {
                         const selected = COMMODITY_GROUPS.find(cg => cg.id === value);
                         if (selected) {
                           onUpdate({
@@ -177,7 +177,7 @@ export function Step3AccountingChecks({ draft, onUpdate, onNext, onBack, onRunCh
                   <div className="flex items-center gap-2">
                     <Select
                       value={draft.glAccountId || ""}
-                      onValueChange={(value) => {
+                      onValueChange={(value: string) => {
                         const selected = GL_ACCOUNTS.find(gl => gl.id === value);
                         if (selected) {
                           onUpdate({
@@ -227,7 +227,7 @@ export function Step3AccountingChecks({ draft, onUpdate, onNext, onBack, onRunCh
                   <div className="flex items-center gap-2">
                     <Select
                       value={draft.costCenterId || ""}
-                      onValueChange={(value) => {
+                      onValueChange={(value: string) => {
                         const selected = COST_CENTERS.find(cc => cc.id === value);
                         if (selected) {
                           onUpdate({

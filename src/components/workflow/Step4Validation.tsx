@@ -1,7 +1,7 @@
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "../../components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert";
 import { AlertCircle, CheckCircle, AlertTriangle } from "lucide-react";
-import type { ValidationIssue } from "@/types/workflow";
+import type { ValidationIssue } from "../../types/workflow";
 
 interface Step4Props {
   issues: ValidationIssue[];

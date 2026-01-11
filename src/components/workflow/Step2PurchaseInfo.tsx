@@ -1,9 +1,9 @@
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Checkbox } from "@/components/ui/checkbox";
-import type { PurchaseInfo } from "@/types/workflow";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
+import { RadioGroup, RadioGroupItem } from "../../components/ui/radio-group";
+import { Checkbox } from "../../components/ui/checkbox";
+import type { PurchaseInfo } from "../../types/workflow";
 
 interface Step2Props {
   purchaseInfo: PurchaseInfo;
@@ -29,7 +29,7 @@ export function Step2PurchaseInfo({ purchaseInfo, onUpdate, onNext, onBack }: St
             <Input
               id="usage"
               value={purchaseInfo.usage}
-              onChange={(e) => onUpdate({ usage: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUpdate({ usage: e.target.value })}
               placeholder="e.g., New employee onboarding, Office renovation"
             />
           </div>
@@ -63,7 +63,7 @@ export function Step2PurchaseInfo({ purchaseInfo, onUpdate, onNext, onBack }: St
             {purchaseInfo.isPartOfProject && (
               <Input
                 value={purchaseInfo.projectName || ""}
-                onChange={(e) => onUpdate({ projectName: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUpdate({ projectName: e.target.value })}
                 placeholder="Project name"
               />
             )}
@@ -75,7 +75,7 @@ export function Step2PurchaseInfo({ purchaseInfo, onUpdate, onNext, onBack }: St
               <Input
                 id="deliver-to"
                 value={purchaseInfo.deliverTo}
-                onChange={(e) => onUpdate({ deliverTo: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUpdate({ deliverTo: e.target.value })}
               />
             </div>
             <div className="space-y-2">
@@ -83,7 +83,7 @@ export function Step2PurchaseInfo({ purchaseInfo, onUpdate, onNext, onBack }: St
               <Input
                 id="location"
                 value={purchaseInfo.deliverToLocation}
-                onChange={(e) => onUpdate({ deliverToLocation: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUpdate({ deliverToLocation: e.target.value })}
               />
             </div>
           </div>
@@ -94,7 +94,7 @@ export function Step2PurchaseInfo({ purchaseInfo, onUpdate, onNext, onBack }: St
               id="need-by-date"
               type="date"
               value={purchaseInfo.needByDate}
-              onChange={(e) => onUpdate({ needByDate: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUpdate({ needByDate: e.target.value })}
             />
           </div>
 

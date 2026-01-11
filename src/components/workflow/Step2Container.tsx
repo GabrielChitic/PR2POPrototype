@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Card, CardContent } from "../../components/ui/card";
 import { ShoppingCart, FileText, Briefcase, Upload, AlertCircle, X, Check, FileIcon, Calendar } from "lucide-react";
-import type { DraftPR, PurchaseInfo, RequestType, CLMContract, UploadedFile } from "@/types/workflow";
+import type { DraftPR, PurchaseInfo, RequestType, CLMContract, UploadedFile } from "../../types/workflow";
 
 interface Step2Props {
   draft: DraftPR;
@@ -605,7 +605,7 @@ export function Step2Container({ draft, onUpdate, onNext, onBack, onUpdateDraft 
                         <Input
                           type="date"
                           value={purchaseInfo.needByDate}
-                          onChange={(e) => onUpdate({ needByDate: e.target.value })}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUpdate({ needByDate: e.target.value })}
                         />
                       </div>
                       <div>
@@ -669,7 +669,7 @@ export function Step2Container({ draft, onUpdate, onNext, onBack, onUpdateDraft 
                         <Input
                           className="mt-2"
                           value={purchaseInfo.projectName || ""}
-                          onChange={(e) => onUpdate({ projectName: e.target.value })}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUpdate({ projectName: e.target.value })}
                           placeholder="Initiative or project name"
                         />
                       )}
@@ -725,7 +725,7 @@ export function Step2Container({ draft, onUpdate, onNext, onBack, onUpdateDraft 
                         </label>
                         <Input
                           value={purchaseInfo.deliverToLocation}
-                          onChange={(e) => onUpdate({ deliverToLocation: e.target.value })}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUpdate({ deliverToLocation: e.target.value })}
                           placeholder="City, country or office"
                         />
                       </div>
@@ -829,7 +829,7 @@ export function Step2Container({ draft, onUpdate, onNext, onBack, onUpdateDraft 
                       </label>
                       <Input
                         value={purchaseInfo.deliverTo}
-                        onChange={(e) => onUpdate({ deliverTo: e.target.value })}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUpdate({ deliverTo: e.target.value })}
                         placeholder="Name of person or role"
                       />
                     </div>

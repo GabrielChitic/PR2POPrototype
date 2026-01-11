@@ -4,7 +4,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "./ui/select";
 import type { Persona } from "@/types";
 import { PERSONAS } from "@/data/mockData";
 

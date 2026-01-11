@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils";
-import type { WorkflowStep } from "@/types/workflow";
+import { cn } from "../../lib/utils";
+import type { WorkflowStep } from "../../types/workflow";
 import { Check } from "lucide-react";
 
 interface StepperProps {

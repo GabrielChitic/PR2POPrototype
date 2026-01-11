@@ -1,10 +1,10 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "../../components/ui/button";
+import { Card, CardContent } from "../../components/ui/card";
+import { Badge } from "../../components/ui/badge";
+import { Alert, AlertDescription } from "../../components/ui/alert";
 import { CheckCircle, Clock, User, Info } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { ApprovalStep } from "@/types/workflow";
+import { cn } from "../../lib/utils";
+import type { ApprovalStep } from "../../types/workflow";
 
 interface Step5Props {
   approvalPath: ApprovalStep[];

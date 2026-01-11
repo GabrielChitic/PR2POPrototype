@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Send, Paperclip, ShoppingCart, Package, Briefcase, FileText, List } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "./ui/button";
+import { cn } from "../lib/utils";
 
 interface RequesterHeroLandingProps {
   onSubmit: (message: string) => void;
