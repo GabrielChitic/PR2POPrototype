@@ -1,17 +1,17 @@
 import { useState } from "react";
 import { Plus, Minus, Package, Filter, ArrowUpDown, Calendar, AlertCircle, CheckCircle, AlertTriangle, XCircle, FileCheck, Info } from "lucide-react";
-import { Button } from "../../components/ui/button";
-import { Input } from "../../components/ui/input";
-import { Label } from "../../components/ui/label";
-import { Textarea } from "../../components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
-import { Checkbox } from "../../components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
-import { Badge } from "../../components/ui/badge";
-import { StatusPill } from "../../components/ui/StatusPill";
-import { Separator } from "../../components/ui/separator";
-import { Alert, AlertDescription } from "../../components/ui/alert";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../components/ui/tooltip";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { Textarea } from "../ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import { Checkbox } from "../ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { Badge } from "../ui/badge";
+import { StatusPill } from "../ui/StatusPill";
+import { Separator } from "../ui/separator";
+import { Alert, AlertDescription } from "../ui/alert";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import type { CatalogItem, DraftLineItem, FreeTextItemDraft } from "../../types/workflow";
 
 interface Step1Props {
@@ -477,7 +477,7 @@ export function Step1ChooseItems({
                     id="delivery-date"
                     type="date"
                     value={freeTextForm.desiredDeliveryDate}
-                    onChange={(e) => setFreeTextForm(prev => ({ ...prev, desiredDeliveryDate: e.target.value }))}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFreeTextForm(prev => ({ ...prev, desiredDeliveryDate: e.target.value }))}
                     required
                   />
                 </div>
@@ -490,7 +490,7 @@ export function Step1ChooseItems({
                   <Input
                     id="preferred-supplier"
                     value={freeTextForm.preferredSupplier}
-                    onChange={(e) => setFreeTextForm(prev => ({ ...prev, preferredSupplier: e.target.value }))}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFreeTextForm(prev => ({ ...prev, preferredSupplier: e.target.value }))}
                     placeholder="e.g., Accenture, Dell, etc."
                   />
                 </div>

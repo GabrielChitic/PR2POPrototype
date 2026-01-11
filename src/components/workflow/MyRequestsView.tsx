@@ -1,6 +1,6 @@
 import { Calendar, DollarSign } from "lucide-react";
-import { Card, CardContent } from "../../components/ui/card";
-import { StatusPill } from "../../components/ui/StatusPill";
+import { Card, CardContent } from "../ui/card";
+import { StatusPill } from "../ui/StatusPill";
 import type { PurchaseRequisition } from "@/types";
 
 interface MyRequestsViewProps {

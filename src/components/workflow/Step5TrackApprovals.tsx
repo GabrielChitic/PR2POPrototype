@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { CheckCircle, Clock, User, AlertCircle, Edit, Search, FileText, Package2, ChevronDown, ChevronUp } from "lucide-react";
-import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
-import { Badge } from "../../components/ui/badge";
-import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert";
-import { Input } from "../../components/ui/input";
-import { Separator } from "../../components/ui/separator";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../components/ui/tooltip";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../components/ui/collapsible";
+import { Button } from "../ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import { Badge } from "../ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
+import { Input } from "../ui/input";
+import { Separator } from "../ui/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../ui/collapsible";
 import { cn } from "../../lib/utils";
 import type { SubmittedPR, RequesterAction } from "../../types/workflow";
 

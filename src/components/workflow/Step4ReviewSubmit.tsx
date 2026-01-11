@@ -1,10 +1,10 @@
 import { CheckCircle, AlertTriangle, XCircle, Package, DollarSign, Shield, ChevronRight } from "lucide-react";
-import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
-import { Badge } from "../../components/ui/badge";
-import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert";
-import { Separator } from "../../components/ui/separator";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../components/ui/tooltip";
+import { Button } from "../ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import { Badge } from "../ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
+import { Separator } from "../ui/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import type { DraftPR } from "../../types/workflow";
 
 interface Step4Props {
