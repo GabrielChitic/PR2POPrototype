@@ -1,5 +1,7 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/Card";
-import type { PurchaseRequisition } from "../types";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import type { PurchaseRequisition } from "@/types";
 import { AlertCircle, Info } from "lucide-react";
 
 interface PRDetailsPanelProps {
@@ -30,9 +32,9 @@ export function PRDetailsPanel({ pr }: PRDetailsPanelProps) {
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>{pr.prNumber}</span>
-          <span className="text-sm font-normal px-3 py-1 bg-secondary rounded-full">
+          <Badge variant="secondary" className="text-sm font-normal">
             {pr.status}
-          </span>
+          </Badge>
         </CardTitle>
         <CardDescription>
           Created {pr.createdAt.toLocaleString()}
@@ -41,17 +43,17 @@ export function PRDetailsPanel({ pr }: PRDetailsPanelProps) {
       <CardContent className="space-y-6">
         {/* Human Review Warning */}
         {pr.intentClassification.needsHumanReview && (
-          <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
-            <div>
-              <div className="font-medium text-amber-900 text-sm">
+          <Alert variant="warning">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <div className="font-medium text-sm">
                 Human Review Recommended
               </div>
-              <div className="text-xs text-amber-700 mt-1">
+              <div className="text-xs mt-1">
                 Confidence: {pr.intentClassification.confidence}
               </div>
-            </div>
-          </div>
+            </AlertDescription>
+          </Alert>
         )}
 
         {/* Original Request */}

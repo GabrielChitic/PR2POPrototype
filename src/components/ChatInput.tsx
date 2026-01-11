@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
-import { Button } from "./ui/Button";
-import { Input } from "./ui/Input";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Send } from "lucide-react";
 
 interface ChatInputProps {

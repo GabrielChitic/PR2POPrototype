@@ -1,6 +1,7 @@
-import { Button } from "../ui/Button";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, CheckCircle, AlertTriangle } from "lucide-react";
-import type { ValidationIssue } from "../../types/workflow";
+import type { ValidationIssue } from "@/types/workflow";
 
 interface Step4Props {
   issues: ValidationIssue[];
@@ -27,39 +28,38 @@ export function Step4Validation({ issues, onResolveIssue, onNext, onBack }: Step
 
         {/* All Clear */}
         {allResolved && issues.length === 0 && (
-          <div className="border rounded-lg p-6 bg-green-50 border-green-200">
-            <div className="flex items-start gap-3">
-              <CheckCircle className="h-6 w-6 text-green-600 mt-0.5" />
-              <div>
-                <h3 className="font-semibold text-green-900">Everything looks good!</h3>
-                <p className="text-sm text-green-700 mt-1">
-                  Your request is compliant with all policies. Ready to proceed to approvals.
-                </p>
-              </div>
-            </div>
-          </div>
+          <Alert variant="success">
+            <CheckCircle className="h-4 w-4" />
+            <AlertTitle>Everything looks good!</AlertTitle>
+            <AlertDescription>
+              Your request is compliant with all policies. Ready to proceed to approvals.
+            </AlertDescription>
+          </Alert>
         )}
 
         {/* Errors */}
         {errors.length > 0 && (
           <div className="space-y-3">
             <h3 className="text-sm font-medium flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-red-600" />
+              <AlertCircle className="h-4 w-4 text-destructive" />
               Issues that must be resolved ({errors.length})
             </h3>
             {errors.map((issue) => (
-              <div key={issue.id} className="border border-red-200 rounded-lg p-4 bg-red-50">
-                <p className="text-sm text-red-900 font-medium">{issue.message}</p>
-                {issue.canFix && (
-                  <Button
-                    size="sm"
-                    className="mt-2"
-                    onClick={() => onResolveIssue(issue.id)}
-                  >
-                    {issue.fixAction || "Resolve"}
-                  </Button>
-                )}
-              </div>
+              <Alert key={issue.id} variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <p className="font-medium">{issue.message}</p>
+                  {issue.canFix && (
+                    <Button
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => onResolveIssue(issue.id)}
+                    >
+                      {issue.fixAction || "Resolve"}
+                    </Button>
+                  )}
+                </AlertDescription>
+              </Alert>
             ))}
           </div>
         )}
@@ -72,9 +72,10 @@ export function Step4Validation({ issues, onResolveIssue, onNext, onBack }: Step
               Warnings ({warnings.length})
             </h3>
             {warnings.map((issue) => (
-              <div key={issue.id} className="border border-amber-200 rounded-lg p-4 bg-amber-50">
-                <p className="text-sm text-amber-900">{issue.message}</p>
-              </div>
+              <Alert key={issue.id} variant="warning">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{issue.message}</AlertDescription>
+              </Alert>
             ))}
           </div>
         )}
@@ -86,19 +87,22 @@ export function Step4Validation({ issues, onResolveIssue, onNext, onBack }: Step
               Suggestions for optimization ({suggestions.length})
             </h3>
             {suggestions.map((issue) => (
-              <div key={issue.id} className="border rounded-lg p-4 bg-blue-50 border-blue-200">
-                <p className="text-sm text-blue-900">{issue.message}</p>
-                {issue.canFix && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="mt-2"
-                    onClick={() => onResolveIssue(issue.id)}
-                  >
-                    {issue.fixAction || "Apply suggestion"}
-                  </Button>
-                )}
-              </div>
+              <Alert key={issue.id} variant="info">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <p>{issue.message}</p>
+                  {issue.canFix && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-2"
+                      onClick={() => onResolveIssue(issue.id)}
+                    >
+                      {issue.fixAction || "Apply suggestion"}
+                    </Button>
+                  )}
+                </AlertDescription>
+              </Alert>
             ))}
           </div>
         )}

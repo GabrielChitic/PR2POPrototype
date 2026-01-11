@@ -1,0 +1,184 @@
+// Accounting Master Data for Stage 3
+
+export interface CommodityGroup {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+}
+
+export interface GLAccount {
+  id: string;
+  code: string;
+  name: string;
+  accountType: "OPEX" | "CAPEX";
+  category: string;
+}
+
+export interface CostCenter {
+  id: string;
+  code: string;
+  name: string;
+  location: string;
+  department: string;
+}
+
+// Commodity Groups
+export const COMMODITY_GROUPS: CommodityGroup[] = [
+  {
+    id: "cg-001",
+    code: "IT-HW-LAPTOPS",
+    name: "IT Hardware - Laptops",
+    category: "IT Hardware",
+  },
+  {
+    id: "cg-002",
+    code: "IT-HW-DESKTOPS",
+    name: "IT Hardware - Desktops",
+    category: "IT Hardware",
+  },
+  {
+    id: "cg-003",
+    code: "IT-HW-MONITORS",
+    name: "IT Hardware - Monitors",
+    category: "IT Hardware",
+  },
+  {
+    id: "cg-004",
+    code: "OFFICE-FURN",
+    name: "Office Furniture",
+    category: "Facilities & Office",
+  },
+  {
+    id: "cg-005",
+    code: "IT-SW-LICENSES",
+    name: "IT Software Licenses",
+    category: "IT Software",
+  },
+];
+
+// GL Accounts
+export const GL_ACCOUNTS: GLAccount[] = [
+  {
+    id: "gl-001",
+    code: "612000",
+    name: "IT Equipment (OPEX)",
+    accountType: "OPEX",
+    category: "IT Hardware",
+  },
+  {
+    id: "gl-002",
+    code: "615000",
+    name: "IT Equipment (CAPEX)",
+    accountType: "CAPEX",
+    category: "IT Hardware",
+  },
+  {
+    id: "gl-003",
+    code: "620000",
+    name: "Office Equipment & Furniture",
+    accountType: "OPEX",
+    category: "Facilities & Office",
+  },
+  {
+    id: "gl-004",
+    code: "625000",
+    name: "Software Licenses",
+    accountType: "OPEX",
+    category: "IT Software",
+  },
+  {
+    id: "gl-005",
+    code: "630000",
+    name: "Professional Services",
+    accountType: "OPEX",
+    category: "Services",
+  },
+];
+
+// Cost Centers
+export const COST_CENTERS: CostCenter[] = [
+  {
+    id: "cc-001",
+    code: "CC-RO-BUCH-ENG",
+    name: "Engineering - Bucharest",
+    location: "Bucharest",
+    department: "Engineering",
+  },
+  {
+    id: "cc-002",
+    code: "CC-RO-BUCH-PROD",
+    name: "Product - Bucharest",
+    location: "Bucharest",
+    department: "Product",
+  },
+  {
+    id: "cc-003",
+    code: "CC-US-NYC-ENG",
+    name: "Engineering - New York",
+    location: "New York",
+    department: "Engineering",
+  },
+  {
+    id: "cc-004",
+    code: "CC-US-NYC-SALES",
+    name: "Sales - New York",
+    location: "New York",
+    department: "Sales",
+  },
+  {
+    id: "cc-005",
+    code: "CC-UK-LON-ENG",
+    name: "Engineering - London",
+    location: "London",
+    department: "Engineering",
+  },
+];
+
+// Mapping rules: Category → Commodity Group + GL Account
+export function getDefaultAccountingForCategory(category: string): {
+  commodityGroup: CommodityGroup | null;
+  glAccount: GLAccount | null;
+} {
+  const categoryLower = category.toLowerCase();
+
+  if (categoryLower.includes("it hardware") || categoryLower.includes("laptop") || categoryLower.includes("computer")) {
+    return {
+      commodityGroup: COMMODITY_GROUPS.find(cg => cg.code === "IT-HW-LAPTOPS") || null,
+      glAccount: GL_ACCOUNTS.find(gl => gl.code === "612000") || null,
+    };
+  }
+
+  if (categoryLower.includes("facilities") || categoryLower.includes("office") || categoryLower.includes("furniture")) {
+    return {
+      commodityGroup: COMMODITY_GROUPS.find(cg => cg.code === "OFFICE-FURN") || null,
+      glAccount: GL_ACCOUNTS.find(gl => gl.code === "620000") || null,
+    };
+  }
+
+  // Default fallback
+  return {
+    commodityGroup: COMMODITY_GROUPS[0] || null,
+    glAccount: GL_ACCOUNTS[0] || null,
+  };
+}
+
+// Get default cost center for a location
+export function getDefaultCostCenterForLocation(location: string): CostCenter | null {
+  const locationLower = location.toLowerCase();
+
+  if (locationLower.includes("bucharest")) {
+    return COST_CENTERS.find(cc => cc.location === "Bucharest") || null;
+  }
+
+  if (locationLower.includes("new york") || locationLower.includes("nyc")) {
+    return COST_CENTERS.find(cc => cc.location === "New York") || null;
+  }
+
+  if (locationLower.includes("london")) {
+    return COST_CENTERS.find(cc => cc.location === "London") || null;
+  }
+
+  // Default fallback
+  return COST_CENTERS[0] || null;
+}

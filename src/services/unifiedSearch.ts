@@ -40,10 +40,12 @@ export function inferQuantity(query: string): number {
     return parseInt(quantityMatch[1], 10);
   }
 
-  // Handle written numbers
+  // Handle written numbers (enhanced for canonical demo support)
   const writtenNumbers: Record<string, number> = {
     "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
-    "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10
+    "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+    "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15,
+    "sixteen": 16, "seventeen": 17, "eighteen": 18, "nineteen": 19, "twenty": 20
   };
 
   const queryLower = query.toLowerCase();
@@ -196,7 +198,9 @@ function extractDatePhrase(query: string): string | null {
     /by\s+(end\s+of\s+)?(\w+\s+\d{1,2})/i,
     /by\s+(\w+\s+\d{4})/i,
     /in\s+(\d+\s+(?:days?|weeks?|months?))/i,
-    /next\s+(week|month|quarter)/i,
+    /in\s+a\s+(week|month)/i,
+    /next\s+(week|month|quarter|friday|monday|tuesday|wednesday|thursday|saturday|sunday)/i,
+    /by\s+(january|february|march|april|may|june|july|august|september|october|november|december)/i,
   ];
 
   for (const pattern of patterns) {
@@ -207,6 +211,153 @@ function extractDatePhrase(query: string): string | null {
   }
 
   return null;
+}
+
+/**
+ * Parse natural language date to actual date string (YYYY-MM-DD)
+ * Supports: "in a week", "by Jan 5th", "by April", "next Friday", "in 3 days"
+ */
+export function parseNaturalDate(phrase: string, baseDate?: Date): string {
+  const today = baseDate || new Date();
+  const result = new Date(today);
+
+  const phraseLower = phrase.toLowerCase();
+
+  // "in X days/weeks/months"
+  const inDaysMatch = phraseLower.match(/in\s+(\d+)\s+days?/);
+  if (inDaysMatch) {
+    result.setDate(result.getDate() + parseInt(inDaysMatch[1], 10));
+    return formatDate(result);
+  }
+
+  const inWeeksMatch = phraseLower.match(/in\s+(\d+)\s+weeks?/);
+  if (inWeeksMatch) {
+    result.setDate(result.getDate() + parseInt(inWeeksMatch[1], 10) * 7);
+    return formatDate(result);
+  }
+
+  const inMonthsMatch = phraseLower.match(/in\s+(\d+)\s+months?/);
+  if (inMonthsMatch) {
+    result.setMonth(result.getMonth() + parseInt(inMonthsMatch[1], 10));
+    return formatDate(result);
+  }
+
+  // "in a week" / "in a month"
+  if (phraseLower.includes("in a week")) {
+    result.setDate(result.getDate() + 7);
+    return formatDate(result);
+  }
+  if (phraseLower.includes("in a month")) {
+    result.setMonth(result.getMonth() + 1);
+    return formatDate(result);
+  }
+
+  // "next [day of week]"
+  const daysOfWeek = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  for (let i = 0; i < daysOfWeek.length; i++) {
+    if (phraseLower.includes(`next ${daysOfWeek[i]}`)) {
+      const currentDay = result.getDay();
+      const targetDay = i;
+      const daysUntil = (targetDay - currentDay + 7) % 7 || 7;
+      result.setDate(result.getDate() + daysUntil);
+      return formatDate(result);
+    }
+  }
+
+  // "next week/month/quarter"
+  if (phraseLower.includes("next week")) {
+    result.setDate(result.getDate() + 7);
+    return formatDate(result);
+  }
+  if (phraseLower.includes("next month")) {
+    result.setMonth(result.getMonth() + 1);
+    return formatDate(result);
+  }
+  if (phraseLower.includes("next quarter")) {
+    result.setMonth(result.getMonth() + 3);
+    return formatDate(result);
+  }
+
+  // "by [month]" - defaults to end of that month
+  const months = ["january", "february", "march", "april", "may", "june",
+                  "july", "august", "september", "october", "november", "december"];
+  for (let i = 0; i < months.length; i++) {
+    if (phraseLower.includes(months[i])) {
+      const targetMonth = i;
+      const currentYear = result.getFullYear();
+      const targetYear = targetMonth < result.getMonth() ? currentYear + 1 : currentYear;
+      // Set to last day of month
+      result.setFullYear(targetYear, targetMonth + 1, 0);
+      return formatDate(result);
+    }
+  }
+
+  // "by [month] [day]"
+  const monthDayMatch = phraseLower.match(/by\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})/);
+  if (monthDayMatch) {
+    const monthName = monthDayMatch[1];
+    const day = parseInt(monthDayMatch[2], 10);
+    const targetMonth = months.indexOf(monthName);
+    const currentYear = result.getFullYear();
+    const targetYear = targetMonth < result.getMonth() ? currentYear + 1 : currentYear;
+    result.setFullYear(targetYear, targetMonth, day);
+    return formatDate(result);
+  }
+
+  // Fallback: return date 2 weeks from now
+  result.setDate(result.getDate() + 14);
+  return formatDate(result);
+}
+
+/**
+ * Format date as YYYY-MM-DD
+ */
+function formatDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Extract and parse date from query
+ * Returns formatted date string or empty string
+ */
+export function extractAndParseDate(query: string, baseDate?: Date): string {
+  const datePhrase = extractDatePhrase(query);
+  if (datePhrase) {
+    return parseNaturalDate(datePhrase, baseDate);
+  }
+  return "";
+}
+
+/**
+ * Extract city/location from query
+ */
+export function extractLocation(query: string): string {
+  const queryLower = query.toLowerCase();
+  const cities = [
+    "bucharest", "new york", "london", "paris", "munich", "prague",
+    "berlin", "amsterdam", "madrid", "rome", "vienna", "warsaw",
+    "budapest", "dublin", "lisbon", "brussels", "zurich", "milan",
+    "barcelona", "stockholm", "copenhagen", "helsinki", "oslo"
+  ];
+
+  for (const city of cities) {
+    if (queryLower.includes(city)) {
+      // Capitalize first letter
+      return city.charAt(0).toUpperCase() + city.slice(1);
+    }
+  }
+
+  // Check for "in [location]" pattern
+  const inLocationMatch = queryLower.match(/in\s+([a-z]+(?:\s+[a-z]+)?)/);
+  if (inLocationMatch) {
+    const location = inLocationMatch[1].trim();
+    return location.charAt(0).toUpperCase() + location.slice(1);
+  }
+
+  return "";
 }
 
 /**

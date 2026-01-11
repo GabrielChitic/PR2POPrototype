@@ -1,10 +1,18 @@
 import { useState } from "react";
-import { Plus, Minus, Package, Filter, ArrowUpDown, Calendar } from "lucide-react";
-import { Button } from "../ui/Button";
-import { Input } from "../ui/Input";
-import { Card } from "../ui/Card";
-import { StatusPill } from "../ui/StatusPill";
-import type { CatalogItem, DraftLineItem, FreeTextItemDraft } from "../../types/workflow";
+import { Plus, Minus, Package, Filter, ArrowUpDown, Calendar, AlertCircle, CheckCircle, AlertTriangle, XCircle, FileCheck, Info } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { StatusPill } from "@/components/ui/StatusPill";
+import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import type { CatalogItem, DraftLineItem, FreeTextItemDraft } from "@/types/workflow";
 
 interface Step1Props {
   catalogResults: CatalogItem[];
@@ -16,6 +24,7 @@ interface Step1Props {
   onAddCustomService: () => void;
   freeTextDraft?: Partial<FreeTextItemDraft> | null;
   onUpdateFreeTextDraft?: (draft: Partial<FreeTextItemDraft>) => void;
+  inferredQuantity?: number; // Quantity from chat (e.g., "15 laptops")
 }
 
 export function Step1ChooseItems({
@@ -28,10 +37,14 @@ export function Step1ChooseItems({
   onAddCustomService: _onAddCustomService,
   freeTextDraft,
   onUpdateFreeTextDraft: _onUpdateFreeTextDraft,
+  inferredQuantity,
 }: Step1Props) {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [filterPreferred, setFilterPreferred] = useState(false);
   const [sortBy, setSortBy] = useState<"price-asc" | "price-desc" | "leadtime">("price-asc");
+
+  // Default quantity to use for all items (from chat or 1)
+  const defaultQuantity = inferredQuantity || 1;
 
   // Free text form state
   const [freeTextForm, setFreeTextForm] = useState<Partial<FreeTextItemDraft>>(
@@ -45,7 +58,7 @@ export function Step1ChooseItems({
     }
   );
 
-  const getQuantity = (itemId: string) => quantities[itemId] || 1;
+  const getQuantity = (itemId: string) => quantities[itemId] || defaultQuantity;
 
   const handleQuantityChange = (itemId: string, delta: number) => {
     const current = getQuantity(itemId);
@@ -99,52 +112,65 @@ export function Step1ChooseItems({
       supplierName: freeTextForm.preferredSupplier,
       isPreferredSupplier: false,
       keywords: [],
+      compliance: {
+        preferred: false,
+        contractStatus: "missing",
+        allowed: true,
+      },
     };
 
     onAddItem(mockItem, 1);
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 bg-gray-50">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <TooltipProvider>
+      <div className="flex-1 overflow-y-auto p-8 bg-muted/30">
+        <div className="max-w-6xl mx-auto space-y-6">
         {/* Catalog Grid (1A) */}
         {!showFreeTextForm && catalogResults.length > 0 && (
           <>
             <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Choose items from catalog</h2>
-              <p className="text-sm text-gray-600">
+              <h2 className="text-2xl font-semibold tracking-tight mb-2">Choose items from catalog</h2>
+              <p className="text-sm text-muted-foreground">
                 Found {catalogResults.length} matching items. Select and configure your order below.
               </p>
             </div>
 
             {/* Filters and Sort */}
-            <div className="flex items-center justify-between gap-4 p-4 bg-white rounded-lg border border-gray-200">
-              <div className="flex items-center gap-3">
-                <Filter className="h-4 w-4 text-gray-500" />
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={filterPreferred}
-                    onChange={(e) => setFilterPreferred(e.target.checked)}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-gray-700">Preferred suppliers only</span>
-                </label>
-              </div>
+            <Card>
+              <CardContent className="flex items-center justify-between gap-4 p-4">
+                <div className="flex items-center gap-3">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="filter-preferred"
+                      checked={filterPreferred}
+                      onCheckedChange={(checked) => setFilterPreferred(checked as boolean)}
+                    />
+                    <Label
+                      htmlFor="filter-preferred"
+                      className="text-sm font-normal cursor-pointer"
+                    >
+                      Preferred suppliers only
+                    </Label>
+                  </div>
+                </div>
 
-              <div className="flex items-center gap-2">
-                <ArrowUpDown className="h-4 w-4 text-gray-500" />
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
-                  className="text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-600"
-                >
-                  <option value="price-asc">Price: Low to High</option>
-                  <option value="price-desc">Price: High to Low</option>
-                  <option value="leadtime">Lead Time: Fastest First</option>
-                </select>
-              </div>
-            </div>
+                <div className="flex items-center gap-2">
+                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                  <Select value={sortBy} onValueChange={(value) => setSortBy(value as any)}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="price-asc">Price: Low to High</SelectItem>
+                      <SelectItem value="price-desc">Price: High to Low</SelectItem>
+                      <SelectItem value="leadtime">Lead Time: Fastest First</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Catalog Items Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -153,104 +179,211 @@ export function Step1ChooseItems({
                 const quantity = getQuantity(item.id);
 
                 return (
-                  <Card key={item.id} className="p-6 bg-white hover:shadow-lg transition-shadow">
-                    <div className="flex gap-4">
-                      {/* Thumbnail Image */}
-                      <div className="flex-shrink-0">
-                        <div className="w-24 h-24 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg flex items-center justify-center border border-blue-200">
-                          <Package className="h-12 w-12 text-blue-400" />
+                  <Card key={item.id} className="overflow-hidden transition-all hover:shadow-md">
+                    <CardContent className="p-6">
+                      <div className="flex gap-4">
+                        {/* Thumbnail Image */}
+                        <div className="flex-shrink-0">
+                          <div className="w-24 h-24 bg-gradient-to-br from-primary/10 to-primary/20 rounded-lg flex items-center justify-center border border-primary/20">
+                            <Package className="h-12 w-12 text-primary/60" />
+                          </div>
                         </div>
-                      </div>
 
-                      {/* Content */}
-                      <div className="flex-1 space-y-3">
-                        {/* Header with Name and Badge */}
-                        <div>
-                          <div className="flex items-start justify-between gap-2 mb-1">
-                            <h4 className="font-semibold text-gray-900 text-base leading-tight">{item.name}</h4>
-                            {item.isPreferredSupplier ? (
-                              <StatusPill variant="approved">Preferred</StatusPill>
-                            ) : (
-                              <StatusPill variant="draft">Standard</StatusPill>
+                        {/* Content */}
+                        <div className="flex-1 space-y-3">
+                          {/* Header with Name and Badge */}
+                          <div>
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <h4 className="font-semibold text-base leading-tight">{item.name}</h4>
+                              {item.isPreferredSupplier ? (
+                                <StatusPill variant="approved">Preferred</StatusPill>
+                              ) : (
+                                <Badge variant="outline">Standard</Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>
+                          </div>
+
+                          {/* Compliance Signals */}
+                          <div className="flex flex-wrap items-center gap-2">
+                            {/* Preferred/Non-Preferred */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge
+                                  variant={item.compliance.preferred ? "default" : "outline"}
+                                  className="text-xs font-normal cursor-help gap-1"
+                                >
+                                  {item.compliance.preferred ? (
+                                    <>
+                                      <CheckCircle className="h-3 w-3" />
+                                      Preferred
+                                    </>
+                                  ) : (
+                                    <>
+                                      <AlertTriangle className="h-3 w-3" />
+                                      Non-preferred
+                                    </>
+                                  )}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">
+                                  {item.compliance.preferred ? "Preferred supplier" : item.compliance.preferredReason || "Non-preferred supplier"}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+
+                            {/* Contract Status */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge
+                                  variant={item.compliance.contractStatus === "valid" ? "default" : "outline"}
+                                  className="text-xs font-normal cursor-help gap-1"
+                                >
+                                  {item.compliance.contractStatus === "valid" ? (
+                                    <>
+                                      <FileCheck className="h-3 w-3" />
+                                      Contract
+                                    </>
+                                  ) : (
+                                    <>
+                                      <AlertTriangle className="h-3 w-3" />
+                                      Contract {item.compliance.contractStatus}
+                                    </>
+                                  )}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">
+                                  {item.compliance.contractReason || `Contract status: ${item.compliance.contractStatus}`}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+
+                            {/* Blocked/Allowed */}
+                            {!item.compliance.allowed && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge variant="destructive" className="text-xs font-normal cursor-help gap-1">
+                                    <XCircle className="h-3 w-3" />
+                                    Blocked
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="text-xs max-w-[200px]">
+                                    {item.compliance.blockedReason || "This item is blocked by policy"}
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+
+                            {/* Info icon for more details */}
+                            {item.compliance.allowed && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-5 w-5 p-0">
+                                    <Info className="h-3 w-3 text-muted-foreground" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="text-xs font-medium mb-1">Compliance Details:</p>
+                                  <ul className="text-xs space-y-0.5 text-muted-foreground">
+                                    <li>• Supplier: {item.compliance.preferred ? "Preferred" : "Non-preferred"}</li>
+                                    <li>• Contract: {item.compliance.contractStatus}</li>
+                                    <li>• Status: Allowed</li>
+                                  </ul>
+                                </TooltipContent>
+                              </Tooltip>
                             )}
                           </div>
-                          <p className="text-sm text-gray-600 line-clamp-2">{item.description}</p>
-                        </div>
 
-                        {/* Key Specs */}
-                        {item.specs && Object.keys(item.specs).length > 0 && (
-                          <div className="flex flex-wrap gap-1.5">
-                            {Object.entries(item.specs).slice(0, 3).map(([key, value]) => (
-                              <span
-                                key={key}
-                                className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded font-medium"
-                              >
-                                {key}: {value}
-                              </span>
-                            ))}
+                          {/* Price and Supplier Row */}
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <p className="text-xs text-muted-foreground">Supplier</p>
+                              <p className="text-sm font-medium">{item.supplierName || item.supplier}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-2xl font-bold">${item.unitPrice.toFixed(2)}</p>
+                              <p className="text-xs text-muted-foreground">{item.currency} / {item.unitOfMeasure}</p>
+                            </div>
                           </div>
-                        )}
 
-                        {/* Price and Supplier Row */}
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-0.5">
-                            <p className="text-xs text-gray-500">Supplier</p>
-                            <p className="text-sm text-gray-900 font-medium">{item.supplierName || item.supplier}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-2xl font-bold text-gray-900">${item.unitPrice.toFixed(2)}</p>
-                            <p className="text-xs text-gray-500">{item.currency} / {item.unitOfMeasure}</p>
-                          </div>
-                        </div>
-
-                        {/* Lead Time and Details Link */}
-                        <div className="flex items-center justify-between text-xs">
-                          {item.leadTimeDays && (
-                            <p className="text-gray-600 flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {item.leadTimeDays} days lead time
-                            </p>
-                          )}
-                          <a
-                            href="#"
-                            className="text-blue-600 hover:text-blue-700 font-medium hover:underline"
-                            onClick={(e) => e.preventDefault()}
-                          >
-                            View additional details →
-                          </a>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                          {!isSelected ? (
-                            <>
-                              <div className="flex items-center gap-1 border-2 border-gray-300 rounded-lg bg-white">
-                                <button
-                                  onClick={() => handleQuantityChange(item.id, -1)}
-                                  className="p-2 hover:bg-gray-100 rounded-l-lg transition-colors"
-                                >
-                                  <Minus className="h-4 w-4 text-gray-600" />
-                                </button>
-                                <span className="w-12 text-center font-semibold text-gray-900">{quantity}</span>
-                                <button
-                                  onClick={() => handleQuantityChange(item.id, 1)}
-                                  className="p-2 hover:bg-gray-100 rounded-r-lg transition-colors"
-                                >
-                                  <Plus className="h-4 w-4 text-gray-600" />
-                                </button>
-                              </div>
-                              <Button size="sm" onClick={() => onAddItem(item, quantity)}>
-                                Add to Request
-                              </Button>
-                            </>
-                          ) : (
-                            <Button size="sm" variant="secondary" onClick={() => onRemoveItem(item.id)} className="ml-auto">
-                              Remove
+                          {/* Lead Time and Details Link */}
+                          <div className="flex items-center justify-between text-xs">
+                            {item.leadTimeDays && (
+                              <p className="text-muted-foreground flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                {item.leadTimeDays} days lead time
+                              </p>
+                            )}
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="h-auto p-0 text-xs"
+                              onClick={(e) => e.preventDefault()}
+                            >
+                              View details →
                             </Button>
-                          )}
+                          </div>
+
+                          <Separator />
+
+                          {/* Actions */}
+                          <div className="flex items-center justify-between pt-1">
+                            {!isSelected ? (
+                              <>
+                                <div className="flex items-center border rounded-md">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-9 w-9 rounded-r-none"
+                                    onClick={() => handleQuantityChange(item.id, -1)}
+                                    disabled={!item.compliance.allowed}
+                                  >
+                                    <Minus className="h-4 w-4" />
+                                  </Button>
+                                  <div className="w-12 text-center font-semibold text-sm border-x">
+                                    {quantity}
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-9 w-9 rounded-l-none"
+                                    onClick={() => handleQuantityChange(item.id, 1)}
+                                    disabled={!item.compliance.allowed}
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span>
+                                      <Button
+                                        size="sm"
+                                        onClick={() => onAddItem(item, quantity)}
+                                        disabled={!item.compliance.allowed}
+                                      >
+                                        Add to Request
+                                      </Button>
+                                    </span>
+                                  </TooltipTrigger>
+                                  {!item.compliance.allowed && (
+                                    <TooltipContent>
+                                      <p className="text-xs">Blocked: {item.compliance.blockedReason || "This item cannot be added"}</p>
+                                    </TooltipContent>
+                                  )}
+                                </Tooltip>
+                              </>
+                            ) : (
+                              <Button size="sm" variant="secondary" onClick={() => onRemoveItem(item.id)} className="ml-auto">
+                                Remove
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    </CardContent>
                   </Card>
                 );
               })}
@@ -261,22 +394,25 @@ export function Step1ChooseItems({
         {/* Free Text Form (1B) */}
         {showFreeTextForm && (
           <div className="space-y-6">
-            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
-              <p className="text-sm text-amber-900">
+            <Alert variant="warning">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
                 <strong>No catalog match found.</strong> Please provide details for a custom/free-text item request.
-              </p>
-            </div>
+              </AlertDescription>
+            </Alert>
 
-            <Card className="p-6 bg-white">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Free Text Item Details</h3>
-
-              <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Free Text Item Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 {/* Item Name */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Item Name <span className="text-red-600">*</span>
-                  </label>
+                <div className="space-y-2">
+                  <Label htmlFor="item-name">
+                    Item Name <span className="text-destructive">*</span>
+                  </Label>
                   <Input
+                    id="item-name"
                     value={freeTextForm.itemName}
                     onChange={(e) => setFreeTextForm(prev => ({ ...prev, itemName: e.target.value }))}
                     placeholder="e.g., Consulting services for SAP rollout"
@@ -285,27 +421,28 @@ export function Step1ChooseItems({
                 </div>
 
                 {/* Description */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Description <span className="text-red-600">*</span>
-                  </label>
-                  <textarea
+                <div className="space-y-2">
+                  <Label htmlFor="description">
+                    Description <span className="text-destructive">*</span>
+                  </Label>
+                  <Textarea
+                    id="description"
                     value={freeTextForm.description}
                     onChange={(e) => setFreeTextForm(prev => ({ ...prev, description: e.target.value }))}
                     placeholder="Provide details about what you need..."
                     rows={3}
-                    className="w-full border-2 border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-600"
                     required
                   />
                 </div>
 
                 {/* Estimated Value */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Estimated Budget <span className="text-red-600">*</span>
-                    </label>
+                  <div className="space-y-2">
+                    <Label htmlFor="estimated-budget">
+                      Estimated Budget <span className="text-destructive">*</span>
+                    </Label>
                     <Input
+                      id="estimated-budget"
                       type="number"
                       value={freeTextForm.estimatedValue || ""}
                       onChange={(e) => setFreeTextForm(prev => ({ ...prev, estimatedValue: parseFloat(e.target.value) }))}
@@ -313,26 +450,31 @@ export function Step1ChooseItems({
                       required
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
-                    <select
+                  <div className="space-y-2">
+                    <Label htmlFor="currency">Currency</Label>
+                    <Select
                       value={freeTextForm.currency}
-                      onChange={(e) => setFreeTextForm(prev => ({ ...prev, currency: e.target.value }))}
-                      className="w-full h-10 border-2 border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-600"
+                      onValueChange={(value) => setFreeTextForm(prev => ({ ...prev, currency: value }))}
                     >
-                      <option value="USD">USD</option>
-                      <option value="EUR">EUR</option>
-                      <option value="GBP">GBP</option>
-                    </select>
+                      <SelectTrigger id="currency">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="USD">USD</SelectItem>
+                        <SelectItem value="EUR">EUR</SelectItem>
+                        <SelectItem value="GBP">GBP</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
                 {/* Delivery Date */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Desired Delivery Date <span className="text-red-600">*</span>
-                  </label>
+                <div className="space-y-2">
+                  <Label htmlFor="delivery-date">
+                    Desired Delivery Date <span className="text-destructive">*</span>
+                  </Label>
                   <Input
+                    id="delivery-date"
                     type="date"
                     value={freeTextForm.desiredDeliveryDate}
                     onChange={(e) => setFreeTextForm(prev => ({ ...prev, desiredDeliveryDate: e.target.value }))}
@@ -341,11 +483,12 @@ export function Step1ChooseItems({
                 </div>
 
                 {/* Preferred Supplier */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                <div className="space-y-2">
+                  <Label htmlFor="preferred-supplier">
                     Preferred Supplier (Optional)
-                  </label>
+                  </Label>
                   <Input
+                    id="preferred-supplier"
                     value={freeTextForm.preferredSupplier}
                     onChange={(e) => setFreeTextForm(prev => ({ ...prev, preferredSupplier: e.target.value }))}
                     placeholder="e.g., Accenture, Dell, etc."
@@ -358,7 +501,7 @@ export function Step1ChooseItems({
                     Add to Request
                   </Button>
                 </div>
-              </div>
+              </CardContent>
             </Card>
           </div>
         )}
@@ -410,7 +553,8 @@ export function Step1ChooseItems({
             </div>
           </div>
         )}
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }

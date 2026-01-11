@@ -1,5 +1,5 @@
-import { cn } from "../lib/utils";
-import type { ChatMessage as ChatMessageType } from "../types";
+import { cn } from "@/lib/utils";
+import type { ChatMessage as ChatMessageType } from "@/types";
 
 interface ChatMessageProps {
   message: ChatMessageType;

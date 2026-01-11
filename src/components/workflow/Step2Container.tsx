@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
-import { Button } from "../ui/Button";
-import { Input } from "../ui/Input";
-import { Card } from "../ui/Card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 import { ShoppingCart, FileText, Briefcase, Upload, AlertCircle, X, Check, FileIcon, Calendar } from "lucide-react";
-import type { DraftPR, PurchaseInfo, RequestType, CLMContract, UploadedFile } from "../../types/workflow";
+import type { DraftPR, PurchaseInfo, RequestType, CLMContract, UploadedFile } from "@/types/workflow";
 
 interface Step2Props {
   draft: DraftPR;
@@ -140,8 +140,14 @@ export function Step2Container({ draft, onUpdate, onNext, onBack, onUpdateDraft 
 
   // Calculate total PR value
   const totalValue = draft.lineItems.reduce((sum, item) => sum + item.totalPrice, 0);
+  const totalQuantity = draft.lineItems.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Attachment threshold for non-catalog journeys
   const ATTACHMENT_THRESHOLD = 10000; // $10,000
-  const requiresAttachment = totalValue >= ATTACHMENT_THRESHOLD;
+
+  // For catalog journey, attachments are NOT required (no threshold)
+  // For free text and services, use threshold
+  const requiresAttachment = requestType !== "catalogGoods" && totalValue >= ATTACHMENT_THRESHOLD;
 
   // Form validation
   const purchaseInfo = draft.purchaseInfo || {
@@ -174,24 +180,50 @@ export function Step2Container({ draft, onUpdate, onNext, onBack, onUpdateDraft 
     purchaseInfo.deliverToLocation?.trim().length > 0;
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 bg-gray-50">
+    <div className="flex-1 overflow-y-auto p-8 bg-muted/30">
       <div className="max-w-3xl mx-auto space-y-6">
         {/* Variant 2A: Catalog Goods */}
         {requestType === "catalogGoods" && (
           <>
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 rounded-lg bg-blue-50 flex items-center justify-center">
-                <ShoppingCart className="h-6 w-6 text-blue-600" />
+              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                <ShoppingCart className="h-6 w-6 text-primary" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">Quick Checkout</h2>
-                <p className="text-sm text-gray-600">
+                <h2 className="text-2xl font-semibold tracking-tight text-foreground">Quick Checkout</h2>
+                <p className="text-sm text-muted-foreground">
                   Just a few details and you're done – no long forms here!
                 </p>
               </div>
             </div>
 
-            <Card className="p-6 bg-white">
+            {/* My Request Summary (read-only) */}
+            <Card className="bg-primary/5 border-primary/20">
+              <CardContent className="p-4">
+                <h3 className="text-sm font-semibold text-foreground mb-3">My Request</h3>
+                <div className="space-y-2">
+                  {draft.lineItems.map((item, index) => (
+                    <div key={item.id} className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {index + 1}. {item.name} × {item.quantity}
+                      </span>
+                      <span className="font-medium text-foreground">
+                        ${item.totalPrice.toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="border-t border-primary/20 pt-2 mt-2">
+                    <div className="flex justify-between text-sm font-semibold">
+                      <span className="text-foreground">Total ({totalQuantity} items)</span>
+                      <span className="text-foreground">${totalValue.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
               <div className="space-y-6">
                 {/* Delivery & Recipient */}
                 <div>
@@ -277,48 +309,17 @@ export function Step2Container({ draft, onUpdate, onNext, onBack, onUpdateDraft 
                   </div>
                 </div>
 
-                {/* Conditional Attachments */}
-                {requiresAttachment && (
-                  <>
-                    <div className="border-t border-gray-200"></div>
+                {/* Attachments not required for catalog */}
+                <div className="border-t border-gray-200"></div>
 
-                    <div>
-                      <div className="flex items-start gap-2 p-4 bg-amber-50 border border-amber-200 rounded-lg mb-4">
-                        <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-medium text-amber-900">
-                            Supporting documentation required
-                          </p>
-                          <p className="text-xs text-amber-700 mt-1">
-                            Orders over ${ATTACHMENT_THRESHOLD.toLocaleString()} require a quote or supporting document.
-                          </p>
-                        </div>
-                      </div>
-
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Upload quote or supporting document <span className="text-red-600">*</span>
-                      </label>
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors cursor-pointer">
-                        <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                        <p className="text-sm text-gray-600 mb-1">
-                          Click to upload or drag and drop
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          PDF, PNG, JPG up to 10MB
-                        </p>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {!requiresAttachment && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p className="text-xs text-blue-700">
-                      ✓ No additional documents required for this order. Technical fields (GL code, cost center, etc.) will be derived automatically.
-                    </p>
-                  </div>
-                )}
+                <div className="flex items-start gap-2 p-3 bg-muted/50 border border-border rounded-lg">
+                  <Check className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-muted-foreground">
+                    Attachments not required for catalog items.
+                  </p>
+                </div>
               </div>
+              </CardContent>
             </Card>
           </>
         )}
@@ -327,18 +328,19 @@ export function Step2Container({ draft, onUpdate, onNext, onBack, onUpdateDraft 
         {requestType === "freeTextGoods" && (
           <>
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 rounded-lg bg-amber-50 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-lg bg-amber-500/10 flex items-center justify-center">
                 <FileText className="h-6 w-6 text-amber-600" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">Clarify Your Need</h2>
-                <p className="text-sm text-gray-600">
+                <h2 className="text-2xl font-semibold tracking-tight text-foreground">Clarify Your Need</h2>
+                <p className="text-sm text-muted-foreground">
                   Help us understand what you need so we can find the best match.
                 </p>
               </div>
             </div>
 
-            <Card className="p-6 bg-white">
+            <Card>
+              <CardContent className="p-6">
               <div className="space-y-6">
                 {/* Usage & Context */}
                 <div>
@@ -543,6 +545,7 @@ export function Step2Container({ draft, onUpdate, onNext, onBack, onUpdateDraft 
                   </div>
                 </div>
               </div>
+              </CardContent>
             </Card>
           </>
         )}
@@ -551,18 +554,19 @@ export function Step2Container({ draft, onUpdate, onNext, onBack, onUpdateDraft 
         {requestType === "servicesOrComplex" && (
           <>
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 rounded-lg bg-purple-50 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center">
                 <Briefcase className="h-6 w-6 text-purple-600" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">Service Purchase – Scope & Risk</h2>
-                <p className="text-sm text-gray-600">
+                <h2 className="text-2xl font-semibold tracking-tight text-foreground">Service Purchase – Scope & Risk</h2>
+                <p className="text-sm text-muted-foreground">
                   More detail now means faster approvals and less back-and-forth later.
                 </p>
               </div>
             </div>
 
-            <Card className="p-6 bg-white">
+            <Card>
+              <CardContent className="p-6">
               <div className="space-y-6">
                 {/* Scope & Deliverables */}
                 <div>
@@ -1054,13 +1058,14 @@ export function Step2Container({ draft, onUpdate, onNext, onBack, onUpdateDraft 
                   </div>
                 </div>
               </div>
+              </CardContent>
             </Card>
           </>
         )}
 
         {/* Navigation Buttons */}
         <div className="flex justify-between pt-6">
-          <Button variant="secondary" onClick={onBack}>
+          <Button variant="outline" onClick={onBack}>
             Back to Items
           </Button>
           <Button

@@ -1,6 +1,9 @@
-import { Button } from "../ui/Button";
-import { Input } from "../ui/Input";
-import type { PurchaseInfo } from "../../types/workflow";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
+import type { PurchaseInfo } from "@/types/workflow";
 
 interface Step2Props {
   purchaseInfo: PurchaseInfo;
@@ -21,42 +24,44 @@ export function Step2PurchaseInfo({ purchaseInfo, onUpdate, onNext, onBack }: St
         </div>
 
         <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium mb-2 block">
-              What is this used for? *
-            </label>
+          <div className="space-y-2">
+            <Label htmlFor="usage">What is this used for? *</Label>
             <Input
+              id="usage"
               value={purchaseInfo.usage}
               onChange={(e) => onUpdate({ usage: e.target.value })}
               placeholder="e.g., New employee onboarding, Office renovation"
             />
           </div>
 
-          <div>
-            <label className="text-sm font-medium mb-2 block">
-              Is this part of a project?
-            </label>
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  checked={purchaseInfo.isPartOfProject}
-                  onChange={() => onUpdate({ isPartOfProject: true })}
-                />
-                <span className="text-sm">Yes</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  checked={!purchaseInfo.isPartOfProject}
-                  onChange={() => onUpdate({ isPartOfProject: false, projectName: "" })}
-                />
-                <span className="text-sm">No</span>
-              </label>
-            </div>
+          <div className="space-y-3">
+            <Label>Is this part of a project?</Label>
+            <RadioGroup
+              value={purchaseInfo.isPartOfProject ? "yes" : "no"}
+              onValueChange={(value) => {
+                if (value === "yes") {
+                  onUpdate({ isPartOfProject: true });
+                } else {
+                  onUpdate({ isPartOfProject: false, projectName: "" });
+                }
+              }}
+              className="flex gap-4"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="yes" id="project-yes" />
+                <Label htmlFor="project-yes" className="font-normal cursor-pointer">
+                  Yes
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="no" id="project-no" />
+                <Label htmlFor="project-no" className="font-normal cursor-pointer">
+                  No
+                </Label>
+              </div>
+            </RadioGroup>
             {purchaseInfo.isPartOfProject && (
               <Input
-                className="mt-2"
                 value={purchaseInfo.projectName || ""}
                 onChange={(e) => onUpdate({ projectName: e.target.value })}
                 placeholder="Project name"
@@ -65,57 +70,83 @@ export function Step2PurchaseInfo({ purchaseInfo, onUpdate, onNext, onBack }: St
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">Deliver to</label>
+            <div className="space-y-2">
+              <Label htmlFor="deliver-to">Deliver to</Label>
               <Input
+                id="deliver-to"
                 value={purchaseInfo.deliverTo}
                 onChange={(e) => onUpdate({ deliverTo: e.target.value })}
               />
             </div>
-            <div>
-              <label className="text-sm font-medium mb-2 block">Location</label>
+            <div className="space-y-2">
+              <Label htmlFor="location">Location</Label>
               <Input
+                id="location"
                 value={purchaseInfo.deliverToLocation}
                 onChange={(e) => onUpdate({ deliverToLocation: e.target.value })}
               />
             </div>
           </div>
 
-          <div>
-            <label className="text-sm font-medium mb-2 block">Need by date</label>
+          <div className="space-y-2">
+            <Label htmlFor="need-by-date">Need by date</Label>
             <Input
+              id="need-by-date"
               type="date"
               value={purchaseInfo.needByDate}
               onChange={(e) => onUpdate({ needByDate: e.target.value })}
             />
           </div>
 
-          <div className="border-t pt-4 space-y-3">
-            <p className="text-sm font-medium">Quick compliance checks</p>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={purchaseInfo.involvesPersonalData}
-                onChange={(e) => onUpdate({ involvesPersonalData: e.target.checked })}
-              />
-              <span className="text-sm">Involves personal data</span>
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={purchaseInfo.involvesThirdParty}
-                onChange={(e) => onUpdate({ involvesThirdParty: e.target.checked })}
-              />
-              <span className="text-sm">Involves third-party services</span>
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={purchaseInfo.requiresSpecialApproval}
-                onChange={(e) => onUpdate({ requiresSpecialApproval: e.target.checked })}
-              />
-              <span className="text-sm">Requires special approval</span>
-            </label>
+          <div className="border-t pt-4 space-y-4">
+            <Label className="text-sm font-medium">Quick compliance checks</Label>
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="personal-data"
+                  checked={purchaseInfo.involvesPersonalData}
+                  onCheckedChange={(checked) =>
+                    onUpdate({ involvesPersonalData: checked as boolean })
+                  }
+                />
+                <Label
+                  htmlFor="personal-data"
+                  className="text-sm font-normal cursor-pointer"
+                >
+                  Involves personal data
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="third-party"
+                  checked={purchaseInfo.involvesThirdParty}
+                  onCheckedChange={(checked) =>
+                    onUpdate({ involvesThirdParty: checked as boolean })
+                  }
+                />
+                <Label
+                  htmlFor="third-party"
+                  className="text-sm font-normal cursor-pointer"
+                >
+                  Involves third-party services
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="special-approval"
+                  checked={purchaseInfo.requiresSpecialApproval}
+                  onCheckedChange={(checked) =>
+                    onUpdate({ requiresSpecialApproval: checked as boolean })
+                  }
+                />
+                <Label
+                  htmlFor="special-approval"
+                  className="text-sm font-normal cursor-pointer"
+                >
+                  Requires special approval
+                </Label>
+              </div>
+            </div>
           </div>
         </div>
 

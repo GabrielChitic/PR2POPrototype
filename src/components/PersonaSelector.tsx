@@ -1,6 +1,12 @@
-import { Select } from "./ui/Select";
-import type { Persona } from "../types";
-import { PERSONAS } from "../data/mockData";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { Persona } from "@/types";
+import { PERSONAS } from "@/data/mockData";
 
 interface PersonaSelectorProps {
   selectedPersona: Persona;
@@ -11,8 +17,8 @@ export function PersonaSelector({
   selectedPersona,
   onPersonaChange,
 }: PersonaSelectorProps) {
-  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const persona = PERSONAS.find((p) => p.id === e.target.value);
+  const handleChange = (value: string) => {
+    const persona = PERSONAS.find((p) => p.id === value);
     if (persona) {
       onPersonaChange(persona);
     }
@@ -23,17 +29,17 @@ export function PersonaSelector({
       <label htmlFor="persona-select" className="text-sm font-medium">
         Acting as:
       </label>
-      <Select
-        id="persona-select"
-        value={selectedPersona.id}
-        onChange={handleChange}
-        className="w-auto min-w-[250px]"
-      >
-        {PERSONAS.map((persona) => (
-          <option key={persona.id} value={persona.id}>
-            {persona.name} - {persona.role} ({persona.entity})
-          </option>
-        ))}
+      <Select value={selectedPersona.id} onValueChange={handleChange}>
+        <SelectTrigger className="w-auto min-w-[250px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {PERSONAS.map((persona) => (
+            <SelectItem key={persona.id} value={persona.id}>
+              {persona.name} - {persona.role} ({persona.entity})
+            </SelectItem>
+          ))}
+        </SelectContent>
       </Select>
       <div className="text-xs text-muted-foreground">
         {selectedPersona.location}, {selectedPersona.region}

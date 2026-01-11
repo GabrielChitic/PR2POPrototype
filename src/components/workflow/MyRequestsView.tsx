@@ -1,23 +1,25 @@
 import { Calendar, DollarSign } from "lucide-react";
-import { Card } from "../ui/Card";
-import { StatusPill } from "../ui/StatusPill";
-import type { PurchaseRequisition } from "../../types";
+import { Card, CardContent } from "@/components/ui/card";
+import { StatusPill } from "@/components/ui/StatusPill";
+import type { PurchaseRequisition } from "@/types";
 
-interface MyPRsViewProps {
+interface MyRequestsViewProps {
   prs: PurchaseRequisition[];
   onSelectPR: (pr: PurchaseRequisition) => void;
 }
 
-export function MyPRsView({ prs, onSelectPR }: MyPRsViewProps) {
+export function MyRequestsView({ prs, onSelectPR }: MyRequestsViewProps) {
   if (prs.length === 0) {
     return (
-      <div className="flex-1 p-6">
+      <div className="flex-1 p-8 bg-muted/30">
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-lg font-semibold mb-4">My PRs</h2>
-          <Card className="p-12 text-center">
-            <p className="text-muted-foreground">
-              You haven't created any PRs yet. Start a conversation in the chat to create your first purchase request!
-            </p>
+          <h2 className="text-2xl font-semibold tracking-tight mb-4">My Requests</h2>
+          <Card>
+            <CardContent className="p-12 text-center">
+              <p className="text-muted-foreground">
+                You haven't created any PRs yet. Start a conversation in the chat to create your first purchase request!
+              </p>
+            </CardContent>
           </Card>
         </div>
       </div>
@@ -25,10 +27,10 @@ export function MyPRsView({ prs, onSelectPR }: MyPRsViewProps) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-6">
+    <div className="flex-1 overflow-y-auto p-8 bg-muted/30">
       <div className="max-w-4xl mx-auto space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">My PRs ({prs.length})</h2>
+          <h2 className="text-2xl font-semibold tracking-tight">My Requests ({prs.length})</h2>
         </div>
 
         <div className="space-y-3">
