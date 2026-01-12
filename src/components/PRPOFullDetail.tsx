@@ -1,5 +1,6 @@
-import { useRef } from "react";
-import { ArrowLeft, AlertCircle, CheckCircle, XCircle, AlertTriangle, User, MessageSquare } from "lucide-react";
+import { useRef, useState } from "react";
+import { ArrowLeft, AlertCircle, CheckCircle, XCircle, AlertTriangle, User, MessageSquare, ArrowRight, RefreshCw, Send } from "lucide-react";
+import { useToast } from "../hooks/use-toast";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
@@ -13,6 +14,14 @@ import {
 } from "./ui/accordion";
 import { cn } from "../lib/utils";
 import type { ProcurementPR, ProcurementPO } from "../data/procurementData";
+import { isValidCostCenter, getCostCentersForEntity } from "../data/costCenterData";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 
 interface PRPOFullDetailProps {
   pr: ProcurementPR | null;
@@ -22,6 +31,18 @@ interface PRPOFullDetailProps {
   onBack: () => void;
   onAssign: (id: string, assignee: string) => void;
   onRequestInfo: () => void;
+  onUpdatePR?: (pr: ProcurementPR) => void;
+  onRerunChecks?: (id: string) => void;
+  onConvertToPO?: (prId: string) => void;
+  onRetryPosting?: (poId: string) => void;
+  onDispatchPO?: (poId: string) => void;
+  // Step 5: Lifecycle handlers
+  onSimulateConfirmation?: (poId: string, deviation?: boolean) => void;
+  onContinueToClose?: (poId: string) => void;
+  onReviewChange?: (poId: string) => void;
+  onAcceptChange?: (poId: string) => void;
+  onRejectChange?: (poId: string) => void;
+  onCloseDemo?: (poId: string) => void;
 }
 
 // Phase ribbon definitions
@@ -50,15 +71,36 @@ export function PRPOFullDetail({
   onBack,
   onAssign,
   onRequestInfo,
+  onUpdatePR,
+  onRerunChecks,
+  onConvertToPO,
+  onRetryPosting,
+  onDispatchPO,
+  onSimulateConfirmation,
+  onContinueToClose,
+  onReviewChange,
+  onAcceptChange,
+  onRejectChange,
+  onCloseDemo: _onCloseDemo,
 }: PRPOFullDetailProps) {
   const item = pr || po;
   if (!item) return null;
+
+  const { toast } = useToast();
+
+  // State for accordion control
+  const [openAccordionItems, setOpenAccordionItems] = useState<string[]>([]);
 
   // Refs for scroll targets
   const linesRef = useRef<HTMLDivElement>(null);
   const deliveryRef = useRef<HTMLDivElement>(null);
   const codingRef = useRef<HTMLDivElement>(null);
   const attachmentsRef = useRef<HTMLDivElement>(null);
+
+  // Refs for focusable fields
+  const costCenterRef = useRef<HTMLButtonElement>(null);
+  const deliveryLocationRef = useRef<HTMLDivElement>(null);
+  const needByDateRef = useRef<HTMLDivElement>(null);
 
   // Map phaseStep to current phase index
   const getCurrentPhaseIndex = () => {
@@ -86,43 +128,206 @@ export function PRPOFullDetail({
   const currentPhaseIndex = getCurrentPhaseIndex();
   const phases = pr ? PR_PHASES : PO_PHASES;
 
-  // Generate validation cockpit data
+  // Computed validation cockpit based on actual PR/PO fields
   const getValidationCockpit = () => {
     const failed: Array<{ id: string; name: string; section: string }> = [];
     const warnings: Array<{ id: string; name: string }> = [];
     const passed: Array<{ id: string; name: string }> = [];
 
     if (pr) {
-      if (pr.topBlocker) {
+      // Readiness checks
+      if (pr.deliveryLocation && pr.deliveryLocation.trim() !== "") {
+        passed.push({ id: "pass-delivery-location", name: "Delivery location present" });
+      } else {
         failed.push({
-          id: "blocker-1",
-          name: pr.topBlocker,
-          section: pr.topBlocker.toLowerCase().includes("cost center") ? "coding" : "lines",
-        });
-      }
-      if (pr.slaBreached) {
-        warnings.push({ id: "sla-1", name: "SLA breach detected" });
-      }
-      if (!pr.topBlocker) {
-        passed.push({ id: "pass-1", name: "Mandatory fields present" });
-        passed.push({ id: "pass-2", name: "Policy evaluated" });
-        passed.push({ id: "pass-3", name: "Approval path configured" });
-      }
-    } else if (po) {
-      if (po.failureReason) {
-        failed.push({
-          id: "blocker-1",
-          name: po.failureReason,
+          id: "fail-delivery-location",
+          name: "Delivery location missing",
           section: "delivery",
         });
       }
-      if (po.slaBreached) {
-        warnings.push({ id: "sla-1", name: "SLA breach detected" });
+
+      if (pr.needByDate && pr.needByDate.trim() !== "") {
+        passed.push({ id: "pass-need-by-date", name: "Need-by date present" });
+      } else {
+        failed.push({
+          id: "fail-need-by-date",
+          name: "Need-by date missing",
+          section: "delivery",
+        });
       }
-      if (!po.failureReason) {
-        passed.push({ id: "pass-1", name: "Supplier active" });
-        passed.push({ id: "pass-2", name: "Posting successful" });
-        passed.push({ id: "pass-3", name: "Dispatch ready" });
+
+      if (pr.lineItems && pr.lineItems.length > 0 && pr.lineItems[0].quantity > 0) {
+        passed.push({ id: "pass-lines", name: "Lines present with qty > 0" });
+      } else {
+        failed.push({
+          id: "fail-lines",
+          name: "No line items or quantity is zero",
+          section: "lines",
+        });
+      }
+
+      // Coding / Accounting checks
+      if (pr.costCenter && isValidCostCenter(pr.costCenter, pr.entityCode)) {
+        passed.push({ id: "pass-cost-center", name: "Cost center valid for entity" });
+      } else {
+        failed.push({
+          id: "fail-cost-center",
+          name: "Invalid cost center",
+          section: "coding",
+        });
+      }
+
+      if (pr.glAccount && pr.glAccount.trim() !== "") {
+        passed.push({ id: "pass-gl-account", name: "GL account present" });
+      } else {
+        failed.push({
+          id: "fail-gl-account",
+          name: "GL account missing",
+          section: "coding",
+        });
+      }
+
+      if (pr.commodityGroup && pr.commodityGroup.trim() !== "") {
+        passed.push({ id: "pass-commodity-group", name: "Commodity group present" });
+      } else {
+        failed.push({
+          id: "fail-commodity-group",
+          name: "Commodity group missing",
+          section: "coding",
+        });
+      }
+
+      // Policy / Compliance checks (lightweight for now)
+      passed.push({ id: "pass-preferred-supplier", name: "Preferred supplier policy" });
+      passed.push({ id: "pass-contract", name: "Contract validity" });
+
+      // SLA warnings
+      if (pr.slaBreached) {
+        warnings.push({ id: "warn-sla", name: "SLA breach detected" });
+      }
+    } else if (po) {
+      // PO Validation - Create/Post gate (posting readiness)
+
+      // Supplier check
+      if (po.supplier && po.supplier.trim() !== "") {
+        passed.push({ id: "pass-po-supplier", name: "Supplier active / valid purchasing org mapping" });
+      } else {
+        failed.push({
+          id: "fail-po-supplier",
+          name: "Supplier missing or inactive",
+          section: "delivery",
+        });
+      }
+
+      // Tax/Currency check
+      if (po.currency && po.entityCode) {
+        passed.push({ id: "pass-po-tax-currency", name: "Tax / currency valid for entity" });
+      } else {
+        failed.push({
+          id: "fail-po-tax-currency",
+          name: "Tax or currency invalid",
+          section: "coding",
+        });
+      }
+
+      // Account assignment check
+      if (po.costCenter && po.glAccount) {
+        passed.push({ id: "pass-po-account-assignment", name: "Account assignment valid (cost center + GL present)" });
+      } else {
+        failed.push({
+          id: "fail-po-account-assignment",
+          name: "Account assignment incomplete",
+          section: "coding",
+        });
+      }
+
+      // Price conditions match (demo: assume contract price = unit price for catalog items)
+      if (po.lineItems && po.lineItems.length > 0) {
+        // For demo, all catalog items pass price check
+        passed.push({ id: "pass-po-price", name: "Price conditions match contract/catalog" });
+      } else {
+        failed.push({
+          id: "fail-po-price",
+          name: "Price validation failed",
+          section: "lines",
+        });
+      }
+
+      // Delivery data complete
+      if (po.deliveryLocation && po.needByDate) {
+        passed.push({ id: "pass-po-delivery-data", name: "Delivery data complete (ship-to + requested date)" });
+      } else {
+        failed.push({
+          id: "fail-po-delivery-data",
+          name: "Delivery location or need-by date missing",
+          section: "delivery",
+        });
+      }
+
+      // Total amount matches PR snapshot (if from PR conversion)
+      if (po.amount > 0) {
+        passed.push({ id: "pass-po-amount", name: "Total amount matches PR snapshot" });
+      } else {
+        failed.push({
+          id: "fail-po-amount",
+          name: "Amount validation failed",
+          section: "lines",
+        });
+      }
+
+      // Commodity compliance
+      if (po.commodityGroup && po.commodityGroup.trim() !== "") {
+        passed.push({ id: "pass-po-commodity", name: "No blocked commodity / compliance restriction" });
+      } else {
+        failed.push({
+          id: "fail-po-commodity",
+          name: "Commodity group validation failed",
+          section: "coding",
+        });
+      }
+
+      // Lines check
+      if (po.lineItems && po.lineItems.length > 0 && po.lineItems[0].quantity > 0) {
+        passed.push({ id: "pass-po-lines", name: "Lines present with valid quantities" });
+      } else {
+        failed.push({
+          id: "fail-po-lines",
+          name: "No line items or invalid quantity",
+          section: "lines",
+        });
+      }
+
+      // PO Validation - Dispatch gate (sending readiness)
+
+      // Dispatch channel check
+      if (po.dispatchMethod && po.dispatchMethod.trim() !== "") {
+        passed.push({ id: "pass-po-dispatch-channel", name: "Dispatch channel configured (email/EDI/network)" });
+      } else {
+        warnings.push({ id: "warn-po-dispatch-channel", name: "Dispatch channel not configured" });
+      }
+
+      // Supplier endpoint check (demo: always pass for catalog suppliers)
+      if (po.supplier) {
+        passed.push({ id: "pass-po-supplier-endpoint", name: "Supplier contact / endpoint available" });
+      }
+
+      // PO output form check
+      if (po.poNumber) {
+        passed.push({ id: "pass-po-output-form", name: "PO output form ready (PDF/email body)" });
+      }
+
+      // SLA warnings
+      if (po.slaBreached) {
+        warnings.push({ id: "warn-sla", name: "SLA breach detected" });
+      }
+
+      // If there's a custom failure reason, add it as a failed check
+      if (po.failureReason && !failed.some(f => f.name === po.failureReason)) {
+        failed.push({
+          id: "fail-po-custom",
+          name: po.failureReason,
+          section: "delivery",
+        });
       }
     }
 
@@ -131,21 +336,118 @@ export function PRPOFullDetail({
 
   const cockpit = getValidationCockpit();
 
-  // Handle click-to-fix
-  const handleFixClick = (section: string) => {
+  // Map of check IDs to their field targets
+  const checkFieldMap: Record<string, { section: string; fieldId: string }> = {
+    // PR checks
+    "fail-cost-center": { section: "coding", fieldId: "costCenter" },
+    "fail-gl-account": { section: "coding", fieldId: "glAccount" },
+    "fail-commodity-group": { section: "coding", fieldId: "commodityGroup" },
+    "fail-delivery-location": { section: "delivery", fieldId: "deliveryLocation" },
+    "fail-need-by-date": { section: "delivery", fieldId: "needByDate" },
+    "fail-lines": { section: "lines", fieldId: "" },
+    // PO checks
+    "fail-po-supplier": { section: "delivery", fieldId: "" },
+    "fail-po-tax-currency": { section: "coding", fieldId: "" },
+    "fail-po-account-assignment": { section: "coding", fieldId: "costCenter" },
+    "fail-po-price": { section: "lines", fieldId: "" },
+    "fail-po-delivery-data": { section: "delivery", fieldId: "deliveryLocation" },
+    "fail-po-amount": { section: "lines", fieldId: "" },
+    "fail-po-commodity": { section: "coding", fieldId: "commodityGroup" },
+    "fail-po-lines": { section: "lines", fieldId: "" },
+    "fail-po-custom": { section: "delivery", fieldId: "" },
+  };
+
+  // Handle click-to-fix with accordion expansion and field focus
+  const handleFixClick = (section: string, fieldId?: string) => {
     onTabChange("details");
-    // Scroll to section after tab changes
+
+    // Expand the accordion section
+    if (!openAccordionItems.includes(section)) {
+      setOpenAccordionItems([...openAccordionItems, section]);
+    }
+
+    // Scroll to section and focus field after tab changes
     setTimeout(() => {
-      if (section === "lines" && linesRef.current) {
-        linesRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-      } else if (section === "delivery" && deliveryRef.current) {
-        deliveryRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-      } else if (section === "coding" && codingRef.current) {
-        codingRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-      } else if (section === "attachments" && attachmentsRef.current) {
-        attachmentsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      let targetElement: HTMLDivElement | null = null;
+      let focusElement: HTMLElement | null = null;
+
+      if (section === "lines") {
+        targetElement = linesRef.current;
+      } else if (section === "delivery") {
+        targetElement = deliveryRef.current;
+        if (fieldId === "deliveryLocation") focusElement = deliveryLocationRef.current;
+        else if (fieldId === "needByDate") focusElement = needByDateRef.current;
+      } else if (section === "coding") {
+        targetElement = codingRef.current;
+        if (fieldId === "costCenter") focusElement = costCenterRef.current;
+      } else if (section === "attachments") {
+        targetElement = attachmentsRef.current;
       }
-    }, 100);
+
+      // Scroll to section
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      // Focus and highlight field
+      setTimeout(() => {
+        if (focusElement) {
+          focusElement.focus();
+          focusElement.classList.add("ring-2", "ring-primary", "ring-offset-2");
+          setTimeout(() => {
+            focusElement?.classList.remove("ring-2", "ring-primary", "ring-offset-2");
+          }, 2000);
+        }
+      }, 300);
+    }, 150);
+  };
+
+  // Handle re-run checks from Details tab
+  const handleRerunChecksFromDetails = () => {
+    if (!onRerunChecks || !item.id || !pr) return;
+
+    // Check if all required fields are valid
+    const hasValidCostCenter = pr.costCenter && isValidCostCenter(pr.costCenter, pr.entityCode);
+    const hasDeliveryLocation = pr.deliveryLocation && pr.deliveryLocation.trim() !== "";
+    const hasNeedByDate = pr.needByDate && pr.needByDate.trim() !== "";
+    const hasLineItems = pr.lineItems && pr.lineItems.length > 0 && pr.lineItems[0].quantity > 0;
+    const hasGLAccount = pr.glAccount && pr.glAccount.trim() !== "";
+    const hasCommodityGroup = pr.commodityGroup && pr.commodityGroup.trim() !== "";
+
+    const allValid = hasValidCostCenter && hasDeliveryLocation && hasNeedByDate &&
+                     hasLineItems && hasGLAccount && hasCommodityGroup;
+
+    if (!allValid) {
+      // Find which field is still invalid
+      const missingFields: string[] = [];
+      if (!hasValidCostCenter) missingFields.push("Cost Center");
+      if (!hasDeliveryLocation) missingFields.push("Delivery Location");
+      if (!hasNeedByDate) missingFields.push("Need-by Date");
+      if (!hasLineItems) missingFields.push("Line Items");
+      if (!hasGLAccount) missingFields.push("GL Account");
+      if (!hasCommodityGroup) missingFields.push("Commodity Group");
+
+      toast({
+        title: "Validation failed",
+        description: `Please fix: ${missingFields.join(", ")}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // All checks passed - run validation
+    onRerunChecks(item.id);
+
+    // Show success toast
+    toast({
+      title: "Checks passed!",
+      description: "Gatekeep cleared. PR advanced to next phase.",
+    });
+
+    // Switch back to Overview
+    setTimeout(() => {
+      onTabChange("overview");
+    }, 500);
   };
 
   return (
@@ -326,6 +628,20 @@ export function PRPOFullDetail({
               <Card className="p-6">
                 <h3 className="text-sm font-semibold text-foreground mb-4">Validation Cockpit</h3>
                 <div className="space-y-4">
+                  {/* Step 6: All checks passed state */}
+                  {cockpit.failed.length === 0 && cockpit.warnings.length === 0 && cockpit.passed.length > 0 && (
+                    <div className="flex items-center gap-3 p-4 rounded-md bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
+                      <CheckCircle className="h-6 w-6 text-green-600" />
+                      <div>
+                        <div className="text-sm font-semibold text-green-900 dark:text-green-100">
+                          All checks passed
+                        </div>
+                        <div className="text-xs text-green-700 dark:text-green-300 mt-0.5">
+                          {cockpit.passed.length} {cockpit.passed.length === 1 ? "check" : "checks"} completed successfully
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   {/* Failed */}
                   {cockpit.failed.length > 0 && (
                     <div>
@@ -336,18 +652,24 @@ export function PRPOFullDetail({
                         </span>
                       </div>
                       <div className="space-y-2 ml-6">
-                        {cockpit.failed.map((check) => (
-                          <div
-                            key={check.id}
-                            className="flex items-center justify-between p-3 rounded-md bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 cursor-pointer hover:bg-red-100 dark:hover:bg-red-950/30 transition-colors"
-                            onClick={() => handleFixClick(check.section)}
-                          >
-                            <span className="text-sm text-red-900 dark:text-red-100">{check.name}</span>
-                            <Button variant="ghost" size="sm" className="h-7 text-xs text-red-600 hover:text-red-700">
-                              Fix →
-                            </Button>
-                          </div>
-                        ))}
+                        {cockpit.failed.map((check) => {
+                          const fieldMapping = checkFieldMap[check.id];
+                          return (
+                            <div
+                              key={check.id}
+                              className="flex items-center justify-between p-3 rounded-md bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 cursor-pointer hover:bg-red-100 dark:hover:bg-red-950/30 transition-colors"
+                              onClick={() => handleFixClick(
+                                fieldMapping?.section || check.section,
+                                fieldMapping?.fieldId
+                              )}
+                            >
+                              <span className="text-sm text-red-900 dark:text-red-100">{check.name}</span>
+                              <Button variant="ghost" size="sm" className="h-7 text-xs text-red-600 hover:text-red-700">
+                                Fix →
+                              </Button>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -398,6 +720,153 @@ export function PRPOFullDetail({
                 </div>
               </Card>
 
+              {/* Step 5: PO Lifecycle Card (Confirm/Change/Close phases) */}
+              {po && (po.phaseStep === "Confirm" || po.phaseStep === "Change" || po.phaseStep === "Close") && (
+                <Card className="p-6">
+                  <h3 className="text-sm font-semibold text-foreground mb-4">PO Lifecycle</h3>
+                  <div className="space-y-4">
+                    {/* Confirm Phase - WAITING status */}
+                    {po.phaseStep === "Confirm" && po.confirmationStatus === "WAITING" && (
+                      <div className="p-4 rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/20">
+                        <div className="flex items-center gap-2 mb-3">
+                          <AlertCircle className="h-5 w-5 text-blue-600" />
+                          <span className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                            Waiting for Supplier Confirmation
+                          </span>
+                        </div>
+                        <p className="text-sm text-blue-800 dark:text-blue-200 mb-3">
+                          PO has been sent to supplier. Awaiting order confirmation.
+                        </p>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={() => onSimulateConfirmation?.(po.id, false)}
+                          >
+                            Simulate Confirmation (No Issues)
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onSimulateConfirmation?.(po.id, true)}
+                          >
+                            Simulate Deviation
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Confirm Phase - RECEIVED status */}
+                    {po.phaseStep === "Confirm" && po.confirmationStatus === "RECEIVED" && (
+                      <div className="p-4 rounded-md border border-green-200 bg-green-50 dark:bg-green-950/20">
+                        <div className="flex items-center gap-2 mb-3">
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                          <span className="text-sm font-semibold text-green-900 dark:text-green-100">
+                            Confirmation Received
+                          </span>
+                        </div>
+                        <div className="space-y-2 text-sm text-green-800 dark:text-green-200 mb-3">
+                          <p><strong>Confirmed Delivery:</strong> {po.confirmedDeliveryDate ? new Date(po.confirmedDeliveryDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}</p>
+                          {po.confirmationNote && <p><strong>Note:</strong> {po.confirmationNote}</p>}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={() => onContinueToClose?.(po.id)}
+                        >
+                          <ArrowRight className="h-4 w-4 mr-2" />
+                          Continue to Close
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Confirm Phase - DEVIATION status */}
+                    {po.phaseStep === "Confirm" && po.confirmationStatus === "DEVIATION" && (
+                      <div className="p-4 rounded-md border border-orange-200 bg-orange-50 dark:bg-orange-950/20">
+                        <div className="flex items-center gap-2 mb-3">
+                          <AlertTriangle className="h-5 w-5 text-orange-600" />
+                          <span className="text-sm font-semibold text-orange-900 dark:text-orange-100">
+                            Confirmation Deviation Detected
+                          </span>
+                        </div>
+                        <div className="space-y-2 text-sm text-orange-800 dark:text-orange-200 mb-3">
+                          <p><strong>Original Delivery:</strong> {po.needByDate ? new Date(po.needByDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}</p>
+                          <p><strong>Proposed Delivery:</strong> {po.proposedChanges?.deliveryDate ? new Date(po.proposedChanges.deliveryDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}</p>
+                          {po.confirmationNote && <p><strong>Reason:</strong> {po.confirmationNote}</p>}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={() => onReviewChange?.(po.id)}
+                        >
+                          <AlertCircle className="h-4 w-4 mr-2" />
+                          Review Change Request
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Change Phase - PENDING status */}
+                    {po.phaseStep === "Change" && po.changeStatus === "PENDING" && (
+                      <div className="p-4 rounded-md border border-purple-200 bg-purple-50 dark:bg-purple-950/20">
+                        <div className="flex items-center gap-2 mb-3">
+                          <AlertCircle className="h-5 w-5 text-purple-600" />
+                          <span className="text-sm font-semibold text-purple-900 dark:text-purple-100">
+                            Change Decision Required
+                          </span>
+                        </div>
+                        <div className="space-y-2 text-sm text-purple-800 dark:text-purple-200 mb-3">
+                          <p><strong>Current Delivery:</strong> {po.needByDate ? new Date(po.needByDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}</p>
+                          <p><strong>Proposed Delivery:</strong> {po.proposedChanges?.deliveryDate ? new Date(po.proposedChanges.deliveryDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}</p>
+                          <p className="text-xs">Accepting will update the PO with the new delivery date.</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={() => onAcceptChange?.(po.id)}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Accept Changes
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onRejectChange?.(po.id)}
+                          >
+                            <XCircle className="h-4 w-4 mr-2" />
+                            Reject Changes
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Close Phase */}
+                    {po.phaseStep === "Close" && po.closeStatus === "CLOSED_DEMO" && (
+                      <div className="p-4 rounded-md border border-gray-200 bg-gray-50 dark:bg-gray-950/20">
+                        <div className="flex items-center gap-2 mb-3">
+                          <CheckCircle className="h-5 w-5 text-gray-600" />
+                          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                            PO Closed
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-800 dark:text-gray-200 mb-3">
+                          This purchase order has been successfully closed.
+                          {po.changeStatus === "ACCEPTED" && " Changes were accepted and applied."}
+                          {po.changeStatus === "REJECTED" && " Changes were rejected."}
+                        </p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => onTabChange("audit")}
+                        >
+                          View Audit Trail
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
+
               {/* Next Best Actions */}
               <Card className="p-6">
                 <h3 className="text-sm font-semibold text-foreground mb-4">Next Best Actions</h3>
@@ -418,14 +887,76 @@ export function PRPOFullDetail({
                     <MessageSquare className="h-4 w-4 mr-2" />
                     Request info
                   </Button>
-                  <Button
-                    variant="outline"
-                    className="justify-start"
-                    onClick={() => alert("Checks re-run (stub)")}
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Re-run checks
-                  </Button>
+
+                  {/* PR-specific actions */}
+                  {pr && (
+                    <>
+                      <Button
+                        variant="outline"
+                        className="justify-start"
+                        onClick={() => {
+                          if (onRerunChecks && item.id) {
+                            onRerunChecks(item.id);
+                          }
+                        }}
+                        disabled={!onRerunChecks}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Re-run checks
+                      </Button>
+                      <Button
+                        variant={pr.phaseStep === "Ready for PO" ? "default" : "outline"}
+                        className="justify-start"
+                        onClick={() => {
+                          if (onConvertToPO && pr.id) {
+                            onConvertToPO(pr.id);
+                          }
+                        }}
+                        disabled={!onConvertToPO || pr.phaseStep !== "Ready for PO"}
+                        title={pr.phaseStep !== "Ready for PO" ? "PR must pass gatekeep and be Ready for PO" : "Convert this PR to a Purchase Order"}
+                      >
+                        <ArrowRight className="h-4 w-4 mr-2" />
+                        Convert to PO
+                      </Button>
+                    </>
+                  )}
+
+                  {/* PO-specific actions */}
+                  {po && (
+                    <>
+                      {po.failureReason && (
+                        <Button
+                          variant="default"
+                          className="justify-start"
+                          onClick={() => {
+                            if (onRetryPosting && po.id) {
+                              onRetryPosting(po.id);
+                            }
+                          }}
+                          disabled={!onRetryPosting}
+                        >
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Retry posting
+                        </Button>
+                      )}
+                      {po.phaseStep === "Dispatch" && po.dispatchStatus === "Ready to send" && (
+                        <Button
+                          variant="default"
+                          className="justify-start"
+                          onClick={() => {
+                            if (onDispatchPO && po.id) {
+                              onDispatchPO(po.id);
+                            }
+                          }}
+                          disabled={!onDispatchPO}
+                        >
+                          <Send className="h-4 w-4 mr-2" />
+                          Send PO
+                        </Button>
+                      )}
+                    </>
+                  )}
+
                   <Button
                     variant="outline"
                     className="justify-start"
@@ -439,86 +970,269 @@ export function PRPOFullDetail({
             </TabsContent>
 
             {/* Details Tab */}
-            <TabsContent value="details" className="space-y-4 m-0">
-              <Accordion type="multiple" className="space-y-4">
+            <TabsContent value="details" className="space-y-4 m-0 relative pb-20">
+              {/* Step 6: Rerun checks CTA in Details tab (for PRs) */}
+              {pr && (
+                <div className="sticky top-0 z-10 flex justify-end mb-4 bg-background/95 backdrop-blur py-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      if (onRerunChecks && pr.id) {
+                        onRerunChecks(pr.id);
+                      }
+                    }}
+                    disabled={!onRerunChecks}
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Re-run checks
+                  </Button>
+                </div>
+              )}
+              <Accordion
+                type="multiple"
+                value={openAccordionItems}
+                onValueChange={setOpenAccordionItems}
+                className="space-y-4"
+              >
                 {/* Lines */}
-                <AccordionItem value="lines" ref={linesRef} className="border rounded-md px-4">
-                  <AccordionTrigger className="hover:no-underline">
-                    <span className="font-semibold">Lines (Items/Services)</span>
-                  </AccordionTrigger>
-                  <AccordionContent className="pt-4">
-                    <div className="text-sm text-muted-foreground">
-                      <p>Line items will appear here in Step 3+.</p>
-                      <p className="mt-2">Example: Dell Latitude 5430 × 15 @ $1,200 each</p>
+                <AccordionItem value="lines" ref={linesRef} className="border rounded-md px-4 bg-white">
+                  <AccordionTrigger className="hover:no-underline py-3">
+                    <div className="flex items-center justify-between flex-1 mr-2">
+                      <span className="font-semibold text-sm">Lines (Items/Services)</span>
+                      {pr?.lineItems && pr.lineItems.length > 0 && (
+                        <span className="text-xs text-muted-foreground">
+                          {pr.lineItems.length} {pr.lineItems.length === 1 ? "item" : "items"}
+                        </span>
+                      )}
                     </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-2 pb-4">
+                    {((pr?.lineItems && pr.lineItems.length > 0) || (po?.lineItems && po.lineItems.length > 0)) ? (
+                      <div className="space-y-2">
+                        {(pr?.lineItems || po?.lineItems || []).map((line) => (
+                          <div
+                            key={line.id}
+                            className="flex items-center justify-between p-2.5 rounded-md border bg-muted/30"
+                          >
+                            <div className="flex-1">
+                              <div className="font-medium text-sm text-foreground">
+                                {line.description}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                              <span>Qty: <span className="font-medium text-foreground">{line.quantity}</span></span>
+                              <span>@ ${line.unitPrice.toLocaleString()}</span>
+                              <span className="font-semibold text-foreground min-w-[80px] text-right">
+                                ${(line.quantity * line.unitPrice).toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground py-2">
+                        <p>No line items found.</p>
+                      </div>
+                    )}
                   </AccordionContent>
                 </AccordionItem>
 
                 {/* Delivery / Location */}
-                <AccordionItem value="delivery" ref={deliveryRef} className="border rounded-md px-4">
-                  <AccordionTrigger className="hover:no-underline">
-                    <span className="font-semibold">Delivery / Location</span>
+                <AccordionItem value="delivery" ref={deliveryRef} className="border rounded-md px-4 bg-white">
+                  <AccordionTrigger className="hover:no-underline py-3">
+                    <span className="font-semibold text-sm">Delivery / Location</span>
                   </AccordionTrigger>
-                  <AccordionContent className="pt-4">
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Location:</span>
-                        <span className="font-medium">
-                          {pr?.title.includes("Bucharest") ? "Bucharest" :
-                           pr?.title.includes("New York") ? "New York" :
-                           pr?.title.includes("Munich") ? "Munich" :
-                           pr?.title.includes("Tokyo") ? "Tokyo" : "—"}
-                        </span>
+                  <AccordionContent className="pt-2 pb-4">
+                    {(pr || po) && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5" ref={deliveryLocationRef} tabIndex={-1}>
+                          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                            Delivery Location
+                          </label>
+                          <div className="text-sm font-medium text-foreground">
+                            {(pr?.deliveryLocation || po?.deliveryLocation) || <span className="text-muted-foreground">—</span>}
+                          </div>
+                        </div>
+                        <div className="space-y-1.5" ref={needByDateRef} tabIndex={-1}>
+                          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                            Need-by Date
+                          </label>
+                          <div className="text-sm font-medium text-foreground">
+                            {(pr?.needByDate || po?.needByDate)
+                              ? new Date(pr?.needByDate || po?.needByDate!).toLocaleDateString("en-US", {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                })
+                              : <span className="text-muted-foreground">—</span>}
+                          </div>
+                        </div>
+                        <div className="space-y-1.5 col-span-2">
+                          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                            {pr ? "Delivery Contact" : "Supplier"}
+                          </label>
+                          <div className="text-sm font-medium text-foreground">
+                            {pr ? pr.requester : po?.supplier}
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Delivery contact:</span>
-                        <span className="font-medium">—</span>
-                      </div>
-                    </div>
+                    )}
                   </AccordionContent>
                 </AccordionItem>
 
                 {/* Coding / Accounting */}
-                <AccordionItem value="coding" ref={codingRef} className="border rounded-md px-4">
-                  <AccordionTrigger className="hover:no-underline">
-                    <span className="font-semibold">Coding / Accounting</span>
+                <AccordionItem value="coding" ref={codingRef} className="border rounded-md px-4 bg-white">
+                  <AccordionTrigger className="hover:no-underline py-3">
+                    <span className="font-semibold text-sm">Coding / Accounting</span>
                   </AccordionTrigger>
-                  <AccordionContent className="pt-4">
-                    <div className="space-y-2 text-sm">
-                      {pr && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Entity:</span>
-                          <span className="font-medium">{pr.entityCode}</span>
+                  <AccordionContent className="pt-2 pb-4">
+                    {(pr || po) && (
+                      <div className="space-y-4">
+                        {/* Entity row */}
+                        <div className="pb-2 border-b">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Entity</span>
+                            <span className="text-sm font-semibold text-foreground">{pr?.entityCode || po?.entityCode}</span>
+                          </div>
                         </div>
-                      )}
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Cost Center:</span>
-                        <span className="font-medium">—</span>
+
+                        {/* Form grid */}
+                        <div className="grid grid-cols-2 gap-4">
+                          {/* Commodity Group (read-only) */}
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                              Commodity Group
+                            </label>
+                            <div className="p-2 rounded-md bg-muted/30 text-sm text-foreground border">
+                              {pr?.commodityGroup || po?.commodityGroup || "—"}
+                            </div>
+                          </div>
+
+                          {/* GL Account (read-only) */}
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                              GL Account
+                            </label>
+                            <div className="p-2 rounded-md bg-muted/30 text-sm text-foreground border">
+                              {pr?.glAccount || po?.glAccount || "—"}
+                            </div>
+                          </div>
+
+                          {/* Cost Center - Editable for PR, Read-only for PO */}
+                          <div className="space-y-1.5 col-span-2">
+                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                              Cost Center {pr && <span className="text-red-600">*</span>}
+                            </label>
+                            {pr ? (
+                              <>
+                                <Select
+                                  value={pr.costCenter || ""}
+                                  onValueChange={(value: string) => {
+                                    if (onUpdatePR && pr) {
+                                      onUpdatePR({
+                                        ...pr,
+                                        costCenter: value,
+                                      });
+                                    }
+                                  }}
+                                >
+                                  <SelectTrigger
+                                    ref={costCenterRef}
+                                    className={cn(
+                                      "w-full transition-all",
+                                      pr.costCenter && !isValidCostCenter(pr.costCenter, pr.entityCode) &&
+                                        "border-red-500 focus-visible:ring-red-500"
+                                    )}
+                                  >
+                                    <SelectValue placeholder="Select cost center" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {pr.costCenter && !isValidCostCenter(pr.costCenter, pr.entityCode) && (
+                                      <SelectItem value={pr.costCenter} disabled>
+                                        {pr.costCenter} (Invalid)
+                                      </SelectItem>
+                                    )}
+                                    {getCostCentersForEntity(pr.entityCode).map((cc) => (
+                                      <SelectItem key={cc.code} value={cc.code}>
+                                        {cc.code} — {cc.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                {pr.costCenter && !isValidCostCenter(pr.costCenter, pr.entityCode) && (
+                                  <p className="text-xs text-red-600 flex items-center gap-1 mt-1.5">
+                                    <AlertCircle className="h-3 w-3" />
+                                    Cost center is not valid for entity {pr.entityCode}
+                                  </p>
+                                )}
+                                {pr.costCenter &&
+                                  isValidCostCenter(pr.costCenter, pr.entityCode) &&
+                                  cockpit.failed.some((f) => f.id === "fail-cost-center") && (
+                                    <p className="text-xs text-orange-600 flex items-center gap-1 mt-1.5">
+                                      <AlertCircle className="h-3 w-3" />
+                                      Cost center updated — re-run checks to continue
+                                    </p>
+                                  )}
+                              </>
+                            ) : (
+                              <div className="p-2 rounded-md bg-muted/30 text-sm text-foreground border">
+                                {po?.costCenter || "—"}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">GL Account:</span>
-                        <span className="font-medium">—</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Commodity Group:</span>
-                        <span className="font-medium">—</span>
-                      </div>
-                    </div>
+                    )}
                   </AccordionContent>
                 </AccordionItem>
 
                 {/* Attachments */}
-                <AccordionItem value="attachments" ref={attachmentsRef} className="border rounded-md px-4">
-                  <AccordionTrigger className="hover:no-underline">
-                    <span className="font-semibold">Attachments Checklist</span>
+                <AccordionItem value="attachments" ref={attachmentsRef} className="border rounded-md px-4 bg-white">
+                  <AccordionTrigger className="hover:no-underline py-3">
+                    <span className="font-semibold text-sm">Attachments Checklist</span>
                   </AccordionTrigger>
-                  <AccordionContent className="pt-4">
+                  <AccordionContent className="pt-2 pb-4">
                     <div className="text-sm text-muted-foreground">
                       <p>No required attachments for this item.</p>
                     </div>
                   </AccordionContent>
                 </AccordionItem>
               </Accordion>
+
+              {/* Sticky Action Bar - Re-run Checks CTA */}
+              {pr && onRerunChecks && (
+                <div className="sticky bottom-0 left-0 right-0 bg-white border-t shadow-lg mt-6 p-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">
+                        {cockpit.failed.length > 0
+                          ? `Fix ${cockpit.failed.length} validation ${cockpit.failed.length === 1 ? "issue" : "issues"} and re-run checks`
+                          : "All fields valid — ready to re-run checks"}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Validation will update the PR phase and clear blockers
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => onTabChange("overview")}
+                      >
+                        Back to Overview
+                      </Button>
+                      <Button
+                        onClick={handleRerunChecksFromDetails}
+                        disabled={cockpit.failed.length > 0}
+                        className="min-w-[140px]"
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Re-run checks
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </TabsContent>
 
             {/* Audit Trail Tab */}

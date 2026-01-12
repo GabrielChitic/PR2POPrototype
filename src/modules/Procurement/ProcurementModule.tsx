@@ -26,8 +26,21 @@ import {
 import { Badge } from "../../components/ui/badge";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { cn } from "../../lib/utils";
-import { DEMO_PRS, DEMO_POS, type ProcurementPR, type ProcurementPO } from "../../data/procurementData";
+import {
+  DEMO_PRS,
+  DEMO_POS,
+  type ProcurementPR,
+  type ProcurementPO,
+  type AuditEvent,
+  getPRSlaStatus,
+  getPOSlaStatus,
+  getPRReason,
+  getPRNextAction,
+  getPOReason,
+  getPONextAction,
+} from "../../data/procurementData";
 import { PRPOFullDetail } from "../../components/PRPOFullDetail";
+import { isValidCostCenter } from "../../data/costCenterData";
 
 type WorkbenchTab = "pr" | "po";
 type ViewFilter = "all" | "attention" | "unassigned" | "sla-risk" | "my-queue";
@@ -182,19 +195,13 @@ export function ProcurementModule() {
   };
 
   // Row action handlers
-  // Row click = preview panel
+  // Step 6: Row click = full detail screen (like Open button)
   const handleRowClickPR = (pr: ProcurementPR) => {
-    setSelectedPR(pr);
-    setSelectedPO(null);
-    setDetailTab("overview");
-    setShowDetailPanel(true);
+    handleOpenPR(pr);
   };
 
   const handleRowClickPO = (po: ProcurementPO) => {
-    setSelectedPO(po);
-    setSelectedPR(null);
-    setDetailTab("overview");
-    setShowDetailPanel(true);
+    handleOpenPO(po);
   };
 
   // Open button = full detail screen
@@ -255,6 +262,565 @@ export function ProcurementModule() {
     setRequestInfoDialogOpen(true);
   };
 
+  // Handle PR updates (e.g., cost center change)
+  const handleUpdatePR = (updatedPR: ProcurementPR) => {
+    setPrs((prev) =>
+      prev.map((pr) => (pr.id === updatedPR.id ? updatedPR : pr))
+    );
+    // Also update the full detail state
+    if (fullDetailPR && fullDetailPR.id === updatedPR.id) {
+      setFullDetailPR(updatedPR);
+    }
+  };
+
+  // Re-run checks and update PR state
+  const handleRerunChecks = (prId: string) => {
+    const pr = prs.find((p) => p.id === prId);
+    if (!pr) return;
+
+    // Validate all checks
+    const allChecksPassed = validatePR(pr);
+
+    const oldCostCenter = pr.costCenter;
+    const oldPhase = pr.phaseStep;
+    const oldBlocker = pr.topBlocker;
+
+    let updatedPR = { ...pr };
+
+    if (allChecksPassed) {
+      // Clear blocker
+      updatedPR.topBlocker = null;
+      updatedPR.exception = false;
+
+      // Progress phase
+      if (pr.phaseStep === "Gatekeep") {
+        updatedPR.phaseStep = "Ready for PO";
+      }
+
+      // Add audit events
+      const newAuditEvents: AuditEvent[] = [
+        {
+          id: `audit-rerun-${Date.now()}`,
+          timestamp: new Date(),
+          action: "Checks re-run",
+          actor: "System",
+          details: "All validation checks passed",
+        },
+      ];
+
+      if (oldCostCenter !== pr.costCenter) {
+        newAuditEvents.unshift({
+          id: `audit-cc-${Date.now()}`,
+          timestamp: new Date(),
+          action: "Cost center updated",
+          actor: "Emily Rodriguez",
+          details: `Cost center changed from ${oldCostCenter} to ${pr.costCenter}`,
+        });
+      }
+
+      if (oldPhase === "Gatekeep" && updatedPR.phaseStep !== "Gatekeep") {
+        newAuditEvents.push({
+          id: `audit-phase-${Date.now()}`,
+          timestamp: new Date(),
+          action: "Passed gatekeep",
+          actor: "System",
+          details: "PR passed all gatekeep validations",
+        });
+        newAuditEvents.push({
+          id: `audit-phase-progress-${Date.now()}`,
+          timestamp: new Date(),
+          action: `Phase changed: ${oldPhase} → ${updatedPR.phaseStep}`,
+          actor: "System",
+          details: "PR advanced to next phase",
+        });
+      }
+
+      if (oldBlocker) {
+        newAuditEvents.push({
+          id: `audit-blocker-${Date.now()}`,
+          timestamp: new Date(),
+          action: "Blocker cleared",
+          actor: "System",
+          details: `Resolved: ${oldBlocker}`,
+        });
+      }
+
+      updatedPR.auditTrail = [...updatedPR.auditTrail, ...newAuditEvents];
+    } else {
+      // Still has failures
+      updatedPR.auditTrail = [
+        ...updatedPR.auditTrail,
+        {
+          id: `audit-rerun-fail-${Date.now()}`,
+          timestamp: new Date(),
+          action: "Checks re-run — failures remain",
+          actor: "System",
+          details: `Validation failures still present: ${updatedPR.topBlocker}`,
+        },
+      ];
+    }
+
+    // Update PR in state
+    setPrs((prev) =>
+      prev.map((p) => (p.id === prId ? updatedPR : p))
+    );
+
+    // Update full detail state
+    if (fullDetailPR && fullDetailPR.id === prId) {
+      setFullDetailPR(updatedPR);
+    }
+  };
+
+  // Validate all PR checks
+  const validatePR = (pr: ProcurementPR): boolean => {
+    // Check all required fields
+    const hasDeliveryLocation = !!(pr.deliveryLocation && pr.deliveryLocation.trim() !== "");
+    const hasNeedByDate = !!(pr.needByDate && pr.needByDate.trim() !== "");
+    const hasLineItems = !!(pr.lineItems && pr.lineItems.length > 0 && pr.lineItems[0].quantity > 0);
+    const hasCostCenter = !!(pr.costCenter && isValidCostCenter(pr.costCenter, pr.entityCode));
+    const hasGLAccount = !!(pr.glAccount && pr.glAccount.trim() !== "");
+    const hasCommodityGroup = !!(pr.commodityGroup && pr.commodityGroup.trim() !== "");
+
+    return (
+      hasDeliveryLocation &&
+      hasNeedByDate &&
+      hasLineItems &&
+      hasCostCenter &&
+      hasGLAccount &&
+      hasCommodityGroup
+    );
+  };
+
+  // Convert PR to PO
+  const handleConvertToPO = (prId: string) => {
+    const pr = prs.find((p) => p.id === prId);
+    if (!pr || pr.phaseStep !== "Ready for PO") return;
+
+    // Generate new PO number
+    const newPoNumber = `PO-${Math.floor(1000 + Math.random() * 9000)}`;
+    const newPoId = `po-${Date.now()}`;
+
+    // Create new PO object with data copied from PR
+    const newPO: ProcurementPO = {
+      id: newPoId,
+      poNumber: newPoNumber,
+      supplier: "Dell Direct", // Default supplier for catalog items
+      phaseStep: "Create/Post",
+      failureReason: null,
+      age: "0m",
+      slaBreached: false,
+      amount: pr.amount,
+      currency: pr.currency,
+      assigneeOrResolverGroup: "Unassigned",
+      unassigned: true,
+      exception: false,
+      hold: false,
+      highValue: pr.highValue,
+      dispatchFailed: false,
+      createdAt: new Date(),
+      // Link to source PR
+      sourcePrNumber: pr.prNumber,
+      // Copy data from PR
+      entityCode: pr.entityCode,
+      deliveryLocation: pr.deliveryLocation,
+      needByDate: pr.needByDate,
+      costCenter: pr.costCenter,
+      glAccount: pr.glAccount,
+      commodityGroup: pr.commodityGroup,
+      lineItems: pr.lineItems,
+      dispatchMethod: "Email/Network",
+      dispatchStatus: "Ready to send",
+      auditTrail: [
+        {
+          id: `audit-po-create-${Date.now()}`,
+          timestamp: new Date(),
+          action: "PO Created",
+          actor: "System",
+          details: `Created from ${pr.prNumber}`,
+        },
+      ],
+    };
+
+    // Run PO gate validation
+    const gateChecksPassed = validatePOGate(newPO);
+
+    if (gateChecksPassed) {
+      // Gate passed - move to Dispatch
+      newPO.phaseStep = "Dispatch";
+      newPO.auditTrail.push({
+        id: `audit-po-posted-${Date.now()}`,
+        timestamp: new Date(),
+        action: "Posted successfully",
+        actor: "System",
+        details: "All gate checks passed",
+      });
+      newPO.auditTrail.push({
+        id: `audit-po-dispatch-${Date.now()}`,
+        timestamp: new Date(),
+        action: "Ready to dispatch",
+        actor: "System",
+        details: "PO ready to be sent to supplier",
+      });
+    } else {
+      // Gate failed - stays in Create/Post
+      newPO.failureReason = "Posting failed: validation gate check failed";
+      newPO.exception = true;
+      newPO.auditTrail.push({
+        id: `audit-po-failed-${Date.now()}`,
+        timestamp: new Date(),
+        action: "Posting failed",
+        actor: "System",
+        details: "Gate validation check failed",
+      });
+    }
+
+    // Update PR with link to PO and progress phase
+    const updatedPR: ProcurementPR = {
+      ...pr,
+      linkedPoNumber: newPoNumber,
+      phaseStep: "Converted",
+      auditTrail: [
+        ...pr.auditTrail,
+        {
+          id: `audit-pr-convert-${Date.now()}`,
+          timestamp: new Date(),
+          action: "Converted to PO",
+          actor: "System",
+          details: `${newPoNumber} created`,
+        },
+        {
+          id: `audit-pr-handoff-${Date.now()}`,
+          timestamp: new Date(),
+          action: "Handoff to PO",
+          actor: "System",
+          details: "PR processing complete, now tracking via PO",
+        },
+      ],
+    };
+
+    // Update state
+    setPrs((prev) => prev.map((p) => (p.id === prId ? updatedPR : p)));
+    setPos((prev) => [...prev, newPO]);
+
+    // Update full detail if currently viewing this PR
+    if (fullDetailPR && fullDetailPR.id === prId) {
+      setFullDetailPR(updatedPR);
+    }
+
+    // Switch to PO workbench to show the new PO
+    setActiveTab("po");
+  };
+
+  // Validate PO pre-post gate
+  const validatePOGate = (po: ProcurementPO): boolean => {
+    const hasSupplier = !!(po.supplier && po.supplier.trim() !== "");
+    const hasLines = !!(po.lineItems && po.lineItems.length > 0 && po.lineItems[0].quantity > 0);
+    const hasDeliveryLocation = !!(po.deliveryLocation && po.deliveryLocation.trim() !== "");
+    const hasCoding = !!(po.costCenter && po.glAccount && po.commodityGroup);
+    const amountValid = po.amount > 0;
+
+    return hasSupplier && hasLines && hasDeliveryLocation && hasCoding && amountValid;
+  };
+
+  // Retry posting for failed POs
+  const handleRetryPosting = (poId: string) => {
+    const po = pos.find((p) => p.id === poId);
+    if (!po || !po.failureReason) return;
+
+    // Simulate retry
+    const retrySucceeded = true; // For demo, always succeed on retry
+
+    const updatedPO: ProcurementPO = { ...po };
+
+    if (retrySucceeded) {
+      // Clear failure and move to Dispatch
+      updatedPO.failureReason = null;
+      updatedPO.exception = false;
+      updatedPO.phaseStep = "Dispatch";
+      updatedPO.auditTrail = [
+        ...updatedPO.auditTrail,
+        {
+          id: `audit-po-retry-${Date.now()}`,
+          timestamp: new Date(),
+          action: "Retry posting succeeded",
+          actor: "Emily Rodriguez",
+          details: "Manual retry cleared the blocker",
+        },
+        {
+          id: `audit-po-dispatch-retry-${Date.now()}`,
+          timestamp: new Date(),
+          action: "Ready to dispatch",
+          actor: "System",
+          details: "PO posted successfully on retry",
+        },
+      ];
+    } else {
+      // Retry failed (not used in demo but included for completeness)
+      updatedPO.auditTrail = [
+        ...updatedPO.auditTrail,
+        {
+          id: `audit-po-retry-fail-${Date.now()}`,
+          timestamp: new Date(),
+          action: "Retry posting failed",
+          actor: "Emily Rodriguez",
+          details: "Retry attempted but same error occurred",
+        },
+      ];
+    }
+
+    // Update state
+    setPos((prev) => prev.map((p) => (p.id === poId ? updatedPO : p)));
+
+    // Update full detail if currently viewing this PO
+    if (fullDetailPO && fullDetailPO.id === poId) {
+      setFullDetailPO(updatedPO);
+    }
+  };
+
+  // Dispatch PO
+  const handleDispatchPO = (poId: string) => {
+    const po = pos.find((p) => p.id === poId);
+    if (!po || po.dispatchStatus !== "Ready to send") return;
+
+    const updatedPO: ProcurementPO = {
+      ...po,
+      dispatchStatus: "Sent",
+      dispatchAttemptCount: (po.dispatchAttemptCount || 0) + 1,
+      dispatchLastAttemptAt: new Date(),
+      // Step 5: After successful dispatch, advance to Confirm and wait for confirmation
+      phaseStep: "Confirm",
+      confirmationStatus: "RECEIVED", // For happy path demo, auto-receive
+      confirmedDeliveryDate: po.needByDate, // Matches request
+      confirmedQuantityDelta: 0,
+      confirmationNote: "Supplier confirmed order as requested",
+      closeStatus: "OPEN",
+      auditTrail: [
+        ...po.auditTrail,
+        {
+          id: `audit-po-sent-${Date.now()}`,
+          timestamp: new Date(),
+          action: "PO dispatched",
+          actor: "System",
+          details: "Dispatch message sent to supplier",
+        },
+        {
+          id: `audit-po-confirm-received-${Date.now()}`,
+          timestamp: new Date(),
+          action: "Confirmation received",
+          actor: "System",
+          details: "Supplier confirmed order with no deviations",
+        },
+      ],
+    };
+
+    // Update state
+    setPos((prev) => prev.map((p) => (p.id === poId ? updatedPO : p)));
+
+    // Update full detail if currently viewing this PO
+    if (fullDetailPO && fullDetailPO.id === poId) {
+      setFullDetailPO(updatedPO);
+    }
+  };
+
+  // Step 5: Simulate confirmation (for WAITING status)
+  const handleSimulateConfirmation = (poId: string, deviation: boolean = false) => {
+    const po = pos.find((p) => p.id === poId);
+    if (!po || po.confirmationStatus !== "WAITING") return;
+
+    const updatedPO: ProcurementPO = {
+      ...po,
+      confirmationStatus: deviation ? "DEVIATION" : "RECEIVED",
+      confirmedDeliveryDate: deviation
+        ? new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // +5 days
+        : po.needByDate,
+      confirmedQuantityDelta: 0,
+      confirmationNote: deviation
+        ? "Supplier confirmed later delivery date due to stock availability"
+        : "Supplier confirmed order as requested",
+      proposedChanges: deviation
+        ? {
+            deliveryDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          }
+        : undefined,
+      changeStatus: deviation ? "PENDING" : "NONE",
+      auditTrail: [
+        ...po.auditTrail,
+        {
+          id: `audit-po-confirm-${Date.now()}`,
+          timestamp: new Date(),
+          action: deviation ? "Deviation detected" : "Confirmation received",
+          actor: "System",
+          details: deviation
+            ? "Supplier proposed delivery date change"
+            : "Supplier confirmed order with no deviations",
+        },
+      ],
+    };
+
+    setPos((prev) => prev.map((p) => (p.id === poId ? updatedPO : p)));
+    if (fullDetailPO && fullDetailPO.id === poId) {
+      setFullDetailPO(updatedPO);
+    }
+  };
+
+  // Step 5: Continue to Close (from Confirm RECEIVED)
+  const handleContinueToClose = (poId: string) => {
+    const po = pos.find((p) => p.id === poId);
+    if (!po || po.confirmationStatus !== "RECEIVED") return;
+
+    const updatedPO: ProcurementPO = {
+      ...po,
+      phaseStep: "Close",
+      closeStatus: "CLOSED_DEMO",
+      closedAt: new Date(),
+      auditTrail: [
+        ...po.auditTrail,
+        {
+          id: `audit-po-close-${Date.now()}`,
+          timestamp: new Date(),
+          action: "Closed (demo)",
+          actor: "Emily Rodriguez",
+          details: "PO lifecycle completed successfully",
+        },
+      ],
+    };
+
+    setPos((prev) => prev.map((p) => (p.id === poId ? updatedPO : p)));
+    if (fullDetailPO && fullDetailPO.id === poId) {
+      setFullDetailPO(updatedPO);
+    }
+  };
+
+  // Step 5: Review change (from Confirm DEVIATION to Change phase)
+  const handleReviewChange = (poId: string) => {
+    const po = pos.find((p) => p.id === poId);
+    if (!po || po.confirmationStatus !== "DEVIATION") return;
+
+    const updatedPO: ProcurementPO = {
+      ...po,
+      phaseStep: "Change",
+      auditTrail: [
+        ...po.auditTrail,
+        {
+          id: `audit-po-review-change-${Date.now()}`,
+          timestamp: new Date(),
+          action: "Change under review",
+          actor: "Emily Rodriguez",
+          details: "Reviewing supplier proposed changes",
+        },
+      ],
+    };
+
+    setPos((prev) => prev.map((p) => (p.id === poId ? updatedPO : p)));
+    if (fullDetailPO && fullDetailPO.id === poId) {
+      setFullDetailPO(updatedPO);
+    }
+  };
+
+  // Step 5: Accept change (from Change phase)
+  const handleAcceptChange = (poId: string) => {
+    const po = pos.find((p) => p.id === poId);
+    if (!po || po.changeStatus !== "PENDING") return;
+
+    const updatedPO: ProcurementPO = {
+      ...po,
+      changeStatus: "ACCEPTED",
+      changeDecisionAt: new Date(),
+      // Apply proposed changes
+      needByDate: po.proposedChanges?.deliveryDate || po.needByDate,
+      phaseStep: "Close",
+      closeStatus: "CLOSED_DEMO",
+      closedAt: new Date(),
+      auditTrail: [
+        ...po.auditTrail,
+        {
+          id: `audit-po-accept-change-${Date.now()}`,
+          timestamp: new Date(),
+          action: "Change accepted",
+          actor: "Emily Rodriguez",
+          details: "Supplier proposed changes approved and applied",
+        },
+        {
+          id: `audit-po-close-after-change-${Date.now()}`,
+          timestamp: new Date(),
+          action: "Closed (demo)",
+          actor: "Emily Rodriguez",
+          details: "PO lifecycle completed with accepted changes",
+        },
+      ],
+    };
+
+    setPos((prev) => prev.map((p) => (p.id === poId ? updatedPO : p)));
+    if (fullDetailPO && fullDetailPO.id === poId) {
+      setFullDetailPO(updatedPO);
+    }
+  };
+
+  // Step 5: Reject change (from Change phase)
+  const handleRejectChange = (poId: string) => {
+    const po = pos.find((p) => p.id === poId);
+    if (!po || po.changeStatus !== "PENDING") return;
+
+    const updatedPO: ProcurementPO = {
+      ...po,
+      changeStatus: "REJECTED",
+      changeDecisionAt: new Date(),
+      phaseStep: "Close",
+      closeStatus: "CLOSED_DEMO",
+      closedAt: new Date(),
+      auditTrail: [
+        ...po.auditTrail,
+        {
+          id: `audit-po-reject-change-${Date.now()}`,
+          timestamp: new Date(),
+          action: "Change rejected",
+          actor: "Emily Rodriguez",
+          details: "Supplier proposed changes declined",
+        },
+        {
+          id: `audit-po-close-after-reject-${Date.now()}`,
+          timestamp: new Date(),
+          action: "Closed (demo)",
+          actor: "Emily Rodriguez",
+          details: "PO lifecycle completed with rejected changes",
+        },
+      ],
+    };
+
+    setPos((prev) => prev.map((p) => (p.id === poId ? updatedPO : p)));
+    if (fullDetailPO && fullDetailPO.id === poId) {
+      setFullDetailPO(updatedPO);
+    }
+  };
+
+  // Step 5: Explicit close action (optional)
+  const handleCloseDemo = (poId: string) => {
+    const po = pos.find((p) => p.id === poId);
+    if (!po || po.closeStatus === "CLOSED_DEMO") return;
+
+    const updatedPO: ProcurementPO = {
+      ...po,
+      phaseStep: "Close",
+      closeStatus: "CLOSED_DEMO",
+      closedAt: new Date(),
+      auditTrail: [
+        ...po.auditTrail,
+        {
+          id: `audit-po-close-explicit-${Date.now()}`,
+          timestamp: new Date(),
+          action: "Closed (demo)",
+          actor: "Emily Rodriguez",
+          details: "PO manually closed",
+        },
+      ],
+    };
+
+    setPos((prev) => prev.map((p) => (p.id === poId ? updatedPO : p)));
+    if (fullDetailPO && fullDetailPO.id === poId) {
+      setFullDetailPO(updatedPO);
+    }
+  };
+
   const getEmptyStateText = (workbench: WorkbenchTab, view: ViewFilter) => {
     if (workbench === "pr") {
       if (view === "all") {
@@ -309,6 +875,17 @@ export function ProcurementModule() {
         if (fullDetailPO) handleAssignPO(id, assignee);
       }}
       onRequestInfo={handleRequestInfo}
+      onUpdatePR={handleUpdatePR}
+      onRerunChecks={handleRerunChecks}
+      onConvertToPO={handleConvertToPO}
+      onRetryPosting={handleRetryPosting}
+      onDispatchPO={handleDispatchPO}
+      onSimulateConfirmation={handleSimulateConfirmation}
+      onContinueToClose={handleContinueToClose}
+      onReviewChange={handleReviewChange}
+      onAcceptChange={handleAcceptChange}
+      onRejectChange={handleRejectChange}
+      onCloseDemo={handleCloseDemo}
     />;
   }
 
@@ -490,26 +1067,43 @@ export function ProcurementModule() {
                                   {pr.phaseStep}
                                 </Badge>
                               </td>
-                              {/* Blocker / Exception */}
+                              {/* Reason / Next Action (Step 6) */}
                               <td className="px-4 py-3 text-sm">
-                                {pr.topBlocker ? (
-                                  <div className="flex items-center gap-1 text-orange-600">
-                                    <AlertCircle className="h-4 w-4" />
-                                    <span className="text-xs">{pr.topBlocker}</span>
+                                {getPRReason(pr) ? (
+                                  <div className="space-y-1">
+                                    <Badge
+                                      variant={pr.topBlocker ? "destructive" : pr.hold ? "secondary" : "default"}
+                                      className="text-xs"
+                                    >
+                                      {getPRReason(pr)}
+                                    </Badge>
+                                    {getPRNextAction(pr) && (
+                                      <div className="text-xs text-muted-foreground">
+                                        {getPRNextAction(pr)}
+                                      </div>
+                                    )}
                                   </div>
                                 ) : (
                                   <span className="text-muted-foreground">—</span>
                                 )}
                               </td>
-                              {/* Age / SLA */}
+                              {/* Age / SLA (Step 6) */}
                               <td className="px-4 py-3 text-sm">
-                                <span
-                                  className={cn(
-                                    pr.slaBreached && "text-red-600 font-semibold"
-                                  )}
-                                >
-                                  {pr.age}
-                                </span>
+                                <div className="space-y-1">
+                                  <div className="text-foreground">{pr.age}</div>
+                                  <Badge
+                                    variant={
+                                      getPRSlaStatus(pr) === "Breached"
+                                        ? "destructive"
+                                        : getPRSlaStatus(pr) === "At risk"
+                                        ? "secondary"
+                                        : "outline"
+                                    }
+                                    className="text-xs"
+                                  >
+                                    {getPRSlaStatus(pr)}
+                                  </Badge>
+                                </div>
                               </td>
                               {/* Amount */}
                               <td className="px-4 py-3 text-sm font-medium text-foreground">
@@ -606,6 +1200,9 @@ export function ProcurementModule() {
                             Supplier
                           </th>
                           <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
+                            Source PR
+                          </th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
                             Phase / Step
                           </th>
                           <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
@@ -628,7 +1225,7 @@ export function ProcurementModule() {
                       <tbody>
                         {filteredPOs.length === 0 ? (
                           <tr>
-                            <td colSpan={8} className="px-4 py-16 text-center">
+                            <td colSpan={9} className="px-4 py-16 text-center">
                               <div className="flex flex-col items-center gap-3 max-w-md mx-auto">
                                 <div className="p-4 rounded-full bg-muted/30">
                                   <Filter className="h-8 w-8 text-muted-foreground/50" />
@@ -667,32 +1264,63 @@ export function ProcurementModule() {
                               <td className="px-4 py-3 text-sm text-foreground">
                                 {po.supplier}
                               </td>
+                              {/* Source PR */}
+                              <td className="px-4 py-3 text-sm text-muted-foreground">
+                                {po.sourcePrNumber ? (
+                                  <span className="text-foreground">{po.sourcePrNumber}</span>
+                                ) : (
+                                  <span>—</span>
+                                )}
+                              </td>
                               {/* Phase / Step */}
                               <td className="px-4 py-3 text-sm">
                                 <Badge variant="outline" className="text-xs">
                                   {po.phaseStep}
                                 </Badge>
                               </td>
-                              {/* Failure reason */}
+                              {/* Reason / Next Action (Step 6) */}
                               <td className="px-4 py-3 text-sm max-w-xs">
-                                {po.failureReason ? (
-                                  <div className="flex items-center gap-1 text-red-600">
-                                    <AlertCircle className="h-4 w-4" />
-                                    <span className="text-xs">{po.failureReason}</span>
+                                {getPOReason(po) ? (
+                                  <div className="space-y-1">
+                                    <Badge
+                                      variant={
+                                        po.failureReason || po.dispatchStatus === "Failed"
+                                          ? "destructive"
+                                          : po.confirmationStatus === "DEVIATION" || po.changeStatus === "PENDING"
+                                          ? "secondary"
+                                          : "default"
+                                      }
+                                      className="text-xs"
+                                    >
+                                      {getPOReason(po)}
+                                    </Badge>
+                                    {getPONextAction(po) && (
+                                      <div className="text-xs text-muted-foreground">
+                                        {getPONextAction(po)}
+                                      </div>
+                                    )}
                                   </div>
                                 ) : (
                                   <span className="text-muted-foreground">—</span>
                                 )}
                               </td>
-                              {/* Age / SLA */}
+                              {/* Age / SLA (Step 6) */}
                               <td className="px-4 py-3 text-sm">
-                                <span
-                                  className={cn(
-                                    po.slaBreached && "text-red-600 font-semibold"
-                                  )}
-                                >
-                                  {po.age}
-                                </span>
+                                <div className="space-y-1">
+                                  <div className="text-foreground">{po.age}</div>
+                                  <Badge
+                                    variant={
+                                      getPOSlaStatus(po) === "Breached"
+                                        ? "destructive"
+                                        : getPOSlaStatus(po) === "At risk"
+                                        ? "secondary"
+                                        : "outline"
+                                    }
+                                    className="text-xs"
+                                  >
+                                    {getPOSlaStatus(po)}
+                                  </Badge>
+                                </div>
                               </td>
                               {/* Amount */}
                               <td className="px-4 py-3 text-sm font-medium text-foreground">

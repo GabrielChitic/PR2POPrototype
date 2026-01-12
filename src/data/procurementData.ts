@@ -8,6 +8,9 @@ export interface AuditEvent {
   action: string;
   actor: string;
   details?: string;
+  // Step 6: Key diffs for demo polish
+  keyDiff?: string; // e.g., "Cost center changed: CC-RO-??? → CC-RO-BUCH-ENG"
+  evidenceLabel?: string; // e.g., "Rule snapshot", "Transmission log"
 }
 
 export interface ProcurementPR {
@@ -31,6 +34,20 @@ export interface ProcurementPR {
   entityCode: string;
   createdAt: Date;
   auditTrail: AuditEvent[];
+  // Coding/Accounting fields (Step 3)
+  deliveryLocation?: string;
+  needByDate?: string;
+  costCenter?: string;
+  glAccount?: string;
+  commodityGroup?: string;
+  lineItems?: Array<{
+    id: string;
+    description: string;
+    quantity: number;
+    unitPrice: number;
+  }>;
+  // Step 4: PR→PO linking
+  linkedPoNumber?: string;
 }
 
 export interface ProcurementPO {
@@ -53,6 +70,43 @@ export interface ProcurementPO {
   // Additional fields for detail view
   createdAt: Date;
   auditTrail: AuditEvent[];
+  // Step 4: PR→PO linking
+  sourcePrNumber?: string;
+  // Copied from PR
+  entityCode?: string;
+  deliveryLocation?: string;
+  needByDate?: string;
+  costCenter?: string;
+  glAccount?: string;
+  commodityGroup?: string;
+  lineItems?: Array<{
+    id: string;
+    description: string;
+    quantity: number;
+    unitPrice: number;
+  }>;
+  // Dispatch tracking
+  dispatchMethod?: string;
+  dispatchStatus?: "Ready to send" | "Sent" | "Failed";
+  // Step 5: Extended dispatch fields
+  dispatchAttemptCount?: number;
+  dispatchLastAttemptAt?: Date;
+  dispatchFailureReason?: string;
+  // Step 5: Confirmation tracking
+  confirmationStatus?: "WAITING" | "RECEIVED" | "DEVIATION" | "NOT_USED";
+  confirmedDeliveryDate?: string;
+  confirmedQuantityDelta?: number;
+  confirmationNote?: string;
+  // Step 5: Change tracking
+  changeStatus?: "NONE" | "PENDING" | "ACCEPTED" | "REJECTED";
+  proposedChanges?: {
+    deliveryDate?: string;
+    quantity?: number;
+  };
+  changeDecisionAt?: Date;
+  // Step 5: Close tracking
+  closeStatus?: "OPEN" | "CLOSED_DEMO";
+  closedAt?: Date;
 }
 
 // ============================================================================
@@ -79,6 +133,20 @@ export const DEMO_PRS: ProcurementPR[] = [
     highValue: false,
     entityCode: "UIPATH-RO",
     createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+    // Coding fields (all valid for clean PR)
+    deliveryLocation: "Bucharest",
+    needByDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    costCenter: "CC-RO-BUCH-ENG",
+    glAccount: "612000",
+    commodityGroup: "IT-HW-LAPTOPS",
+    lineItems: [
+      {
+        id: "line-001",
+        description: "Dell Latitude 5430 Laptop",
+        quantity: 15,
+        unitPrice: 1200,
+      },
+    ],
     auditTrail: [
       {
         id: "audit-pr-001-1",
@@ -89,17 +157,24 @@ export const DEMO_PRS: ProcurementPR[] = [
       },
       {
         id: "audit-pr-001-2",
+        timestamp: new Date(Date.now() - 1.8 * 60 * 60 * 1000),
+        action: "Passed gatekeep",
+        actor: "System",
+        details: "All validation checks passed",
+      },
+      {
+        id: "audit-pr-001-3",
         timestamp: new Date(Date.now() - 1.5 * 60 * 60 * 1000),
         action: "Approvals Complete",
         actor: "System",
         details: "All approvals received, ready for PO creation",
       },
       {
-        id: "audit-pr-001-3",
+        id: "audit-pr-001-4",
         timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000),
-        action: "Ingested to Procurement",
+        action: "Reached Ready for PO",
         actor: "System",
-        details: "PR ingested into Procurement Console",
+        details: "PR is ready for purchase order creation",
       },
     ],
   },
@@ -110,7 +185,7 @@ export const DEMO_PRS: ProcurementPR[] = [
     prNumber: "PR-6729",
     title: "12 Laptops — Bucharest",
     phaseStep: "Gatekeep",
-    topBlocker: "Non-preferred supplier — exception required",
+    topBlocker: "Invalid cost center",
     age: "4h",
     slaBreached: false,
     amount: 16200,
@@ -123,6 +198,20 @@ export const DEMO_PRS: ProcurementPR[] = [
     highValue: false,
     entityCode: "UIPATH-RO",
     createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
+    // Coding fields (invalid cost center for exception)
+    deliveryLocation: "Bucharest",
+    needByDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    costCenter: "CC-INVALID-999", // INVALID - causes blocker
+    glAccount: "612000",
+    commodityGroup: "IT-HW-LAPTOPS",
+    lineItems: [
+      {
+        id: "line-002",
+        description: "HP EliteBook 840 G9",
+        quantity: 12,
+        unitPrice: 1350,
+      },
+    ],
     auditTrail: [
       {
         id: "audit-pr-002-1",
@@ -134,16 +223,16 @@ export const DEMO_PRS: ProcurementPR[] = [
       {
         id: "audit-pr-002-2",
         timestamp: new Date(Date.now() - 3.5 * 60 * 60 * 1000),
-        action: "Exception Detected",
+        action: "Validation Failed",
         actor: "System",
-        details: "Non-preferred supplier requires procurement approval",
+        details: "Cost center CC-INVALID-999 is not valid for entity UIPATH-RO",
       },
       {
         id: "audit-pr-002-3",
         timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000),
         action: "Assigned to Queue",
         actor: "System",
-        details: "Routed to IT Procurement Queue for exception handling",
+        details: "Routed to IT Procurement Queue for cost center correction",
       },
     ],
   },
@@ -477,4 +566,211 @@ export const DEMO_POS: ProcurementPO[] = [
       },
     ],
   },
+
+  // Step 5: PO with confirmation deviation (Confirm → Change demo)
+  {
+    id: "po-005",
+    poNumber: "PO-6657",
+    supplier: "HP Direct",
+    phaseStep: "Confirm",
+    failureReason: null,
+    age: "3h",
+    slaBreached: false,
+    amount: 16200,
+    currency: "USD",
+    assigneeOrResolverGroup: "Emily Rodriguez",
+    unassigned: false,
+    exception: true, // Deviation is an exception
+    hold: false,
+    highValue: false,
+    dispatchFailed: false,
+    createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3 hours ago
+    sourcePrNumber: "PR-6730",
+    entityCode: "UIPATH-RO",
+    deliveryLocation: "Bucharest",
+    needByDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 10 days from now
+    costCenter: "CC-RO-BUCH-IT",
+    glAccount: "612000",
+    commodityGroup: "IT-HW-LAPTOPS",
+    lineItems: [
+      {
+        id: "line-005",
+        description: "HP EliteBook 840 G9",
+        quantity: 12,
+        unitPrice: 1350,
+      },
+    ],
+    dispatchMethod: "Email/Network",
+    dispatchStatus: "Sent",
+    dispatchAttemptCount: 1,
+    dispatchLastAttemptAt: new Date(Date.now() - 2.5 * 60 * 60 * 1000),
+    confirmationStatus: "DEVIATION",
+    confirmedDeliveryDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 15 days (5 days later)
+    confirmedQuantityDelta: 0,
+    confirmationNote: "Supplier confirmed later delivery date due to stock availability",
+    proposedChanges: {
+      deliveryDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // +5 days
+    },
+    changeStatus: "PENDING",
+    closeStatus: "OPEN",
+    auditTrail: [
+      {
+        id: "audit-po-005-1",
+        timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000),
+        action: "PO Created",
+        actor: "System",
+        details: "Created from PR-6730",
+      },
+      {
+        id: "audit-po-005-2",
+        timestamp: new Date(Date.now() - 2.8 * 60 * 60 * 1000),
+        action: "Posted successfully",
+        actor: "System",
+        details: "All gate checks passed",
+      },
+      {
+        id: "audit-po-005-3",
+        timestamp: new Date(Date.now() - 2.5 * 60 * 60 * 1000),
+        action: "PO dispatched",
+        actor: "System",
+        details: "Dispatch message sent to supplier",
+      },
+      {
+        id: "audit-po-005-4",
+        timestamp: new Date(Date.now() - 0.5 * 60 * 60 * 1000),
+        action: "Confirmation received",
+        actor: "System",
+        details: "Supplier confirmed with deviation",
+      },
+      {
+        id: "audit-po-005-5",
+        timestamp: new Date(Date.now() - 0.5 * 60 * 60 * 1000),
+        action: "Deviation detected",
+        actor: "System",
+        details: "Delivery date later than requested: +5 days",
+      },
+    ],
+  },
 ];
+
+// ============================================================================
+// STEP 6: DEMO HARDENING HELPERS
+// ============================================================================
+
+// SLA thresholds for demo
+const SLA_THRESHOLDS = {
+  PR: {
+    Gatekeep: 4 * 60, // 4 hours in minutes
+    Reviews: 8 * 60, // 8 hours
+    Approvals: 12 * 60, // 12 hours
+    "Ready for PO": 24 * 60, // 24 hours
+  },
+  PO: {
+    "Create/Post": 2 * 60, // 2 hours
+    Dispatch: 2 * 60, // 2 hours
+    Confirm: 24 * 60, // 24 hours
+    Change: 4 * 60, // 4 hours
+    Close: 0, // No SLA for close
+  },
+};
+
+// Convert age string to minutes
+function ageToMinutes(age: string): number {
+  const match = age.match(/^(\d+)([hd])$/);
+  if (!match) return 0;
+  const value = parseInt(match[1], 10);
+  const unit = match[2];
+  if (unit === "h") return value * 60;
+  if (unit === "d") return value * 24 * 60;
+  return 0;
+}
+
+// Compute SLA status for PR
+export function getPRSlaStatus(pr: ProcurementPR): "On track" | "At risk" | "Breached" {
+  const ageMinutes = ageToMinutes(pr.age);
+  const threshold = SLA_THRESHOLDS.PR[pr.phaseStep as keyof typeof SLA_THRESHOLDS.PR] || 24 * 60;
+
+  if (ageMinutes >= threshold) return "Breached";
+  if (ageMinutes >= threshold * 0.75) return "At risk";
+  return "On track";
+}
+
+// Compute SLA status for PO
+export function getPOSlaStatus(po: ProcurementPO): "On track" | "At risk" | "Breached" {
+  const ageMinutes = ageToMinutes(po.age);
+  const threshold = SLA_THRESHOLDS.PO[po.phaseStep as keyof typeof SLA_THRESHOLDS.PO] || 24 * 60;
+
+  if (threshold === 0) return "On track"; // No SLA for close
+  if (ageMinutes >= threshold) return "Breached";
+  if (ageMinutes >= threshold * 0.75) return "At risk";
+  return "On track";
+}
+
+// Get reason badge text for PR
+export function getPRReason(pr: ProcurementPR): string | null {
+  if (pr.topBlocker) return pr.topBlocker;
+  if (pr.hold) return "On hold";
+  if (pr.phaseStep === "Ready for PO") return "Ready for conversion";
+  return null;
+}
+
+// Get next action hint for PR
+export function getPRNextAction(pr: ProcurementPR): string | null {
+  if (pr.topBlocker === "Invalid cost center") {
+    return "Select a valid cost center and rerun checks";
+  }
+  if (pr.topBlocker) {
+    return "Fix validation issues in Details tab";
+  }
+  if (pr.hold) {
+    return "Resolve hold condition before proceeding";
+  }
+  if (pr.phaseStep === "Ready for PO") {
+    return "Convert to Purchase Order";
+  }
+  if (pr.phaseStep === "Gatekeep") {
+    return "Complete validation checks";
+  }
+  if (pr.phaseStep === "Approvals") {
+    return "Waiting for approvals";
+  }
+  return null;
+}
+
+// Get reason badge text for PO
+export function getPOReason(po: ProcurementPO): string | null {
+  if (po.failureReason) return po.failureReason;
+  if (po.dispatchStatus === "Failed") return "Dispatch failed";
+  if (po.confirmationStatus === "DEVIATION") return "Confirmation deviation";
+  if (po.changeStatus === "PENDING") return "Change decision pending";
+  if (po.phaseStep === "Dispatch" && po.dispatchStatus === "Ready to send") {
+    return "Ready to send";
+  }
+  if (po.phaseStep === "Close" && po.closeStatus === "CLOSED_DEMO") {
+    return "Closed";
+  }
+  return null;
+}
+
+// Get next action hint for PO
+export function getPONextAction(po: ProcurementPO): string | null {
+  if (po.failureReason || po.dispatchStatus === "Failed") {
+    return "Retry dispatch or route to resolver group";
+  }
+  if (po.confirmationStatus === "DEVIATION" || po.changeStatus === "PENDING") {
+    return "Review supplier deviation and accept/reject change";
+  }
+  if (po.phaseStep === "Dispatch" && po.dispatchStatus === "Ready to send") {
+    return "Send PO to supplier";
+  }
+  if (po.confirmationStatus === "RECEIVED") {
+    return "Continue to close";
+  }
+  if (po.phaseStep === "Close") {
+    return "View audit trail";
+  }
+  if (po.phaseStep === "Create/Post") {
+    return "Complete posting validation";
+  }
+  return null;
+}

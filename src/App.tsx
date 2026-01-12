@@ -6,6 +6,7 @@ import { RequesterModuleV2 as RequesterModule } from "./modules/Requester/Reques
 import { ProcurementModule } from "./modules/Procurement/ProcurementModule";
 import { OverviewModule } from "./modules/Overview/OverviewModule";
 import { SettingsModule } from "./modules/Settings/SettingsModule";
+import { Toaster } from "./components/ui/toaster";
 
 function AppContent() {
   const [activeModule, setActiveModule] = useState<ModuleType>("requester");
@@ -60,6 +61,7 @@ function App() {
   return (
     <PRProvider>
       <AppContent />
+      <Toaster />
     </PRProvider>
   );
 }
