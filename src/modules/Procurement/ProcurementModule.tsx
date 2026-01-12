@@ -27,6 +27,7 @@ import { Badge } from "../../components/ui/badge";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { cn } from "../../lib/utils";
 import { DEMO_PRS, DEMO_POS, type ProcurementPR, type ProcurementPO } from "../../data/procurementData";
+import { PRPOFullDetail } from "../../components/PRPOFullDetail";
 
 type WorkbenchTab = "pr" | "po";
 type ViewFilter = "all" | "attention" | "unassigned" | "sla-risk" | "my-queue";
@@ -53,6 +54,12 @@ export function ProcurementModule() {
   const [selectedPO, setSelectedPO] = useState<ProcurementPO | null>(null);
   const [detailTab, setDetailTab] = useState<"overview" | "details" | "audit">("overview");
   const [requestInfoDialogOpen, setRequestInfoDialogOpen] = useState(false);
+
+  // Full detail screen state
+  const [showFullDetail, setShowFullDetail] = useState(false);
+  const [fullDetailPR, setFullDetailPR] = useState<ProcurementPR | null>(null);
+  const [fullDetailPO, setFullDetailPO] = useState<ProcurementPO | null>(null);
+  const [fullDetailTab, setFullDetailTab] = useState<"overview" | "details" | "audit" | "collaboration">("overview");
 
   // Demo data state (mutable for assign actions)
   const [prs, setPrs] = useState<ProcurementPR[]>(DEMO_PRS);
@@ -175,18 +182,41 @@ export function ProcurementModule() {
   };
 
   // Row action handlers
-  const handleOpenPR = (pr: ProcurementPR) => {
+  // Row click = preview panel
+  const handleRowClickPR = (pr: ProcurementPR) => {
     setSelectedPR(pr);
     setSelectedPO(null);
     setDetailTab("overview");
     setShowDetailPanel(true);
   };
 
-  const handleOpenPO = (po: ProcurementPO) => {
+  const handleRowClickPO = (po: ProcurementPO) => {
     setSelectedPO(po);
     setSelectedPR(null);
     setDetailTab("overview");
     setShowDetailPanel(true);
+  };
+
+  // Open button = full detail screen
+  const handleOpenPR = (pr: ProcurementPR) => {
+    setFullDetailPR(pr);
+    setFullDetailPO(null);
+    setFullDetailTab("overview");
+    setShowFullDetail(true);
+  };
+
+  const handleOpenPO = (po: ProcurementPO) => {
+    setFullDetailPO(po);
+    setFullDetailPR(null);
+    setFullDetailTab("overview");
+    setShowFullDetail(true);
+  };
+
+  // Back to workbench
+  const handleBackToWorkbench = () => {
+    setShowFullDetail(false);
+    setFullDetailPR(null);
+    setFullDetailPO(null);
   };
 
   const handleAssignPR = (prId: string, assignee: string) => {
@@ -265,6 +295,22 @@ export function ProcurementModule() {
   const filteredPRs = filterPRs();
   const filteredPOs = filterPOs();
   const emptyState = getEmptyStateText(activeTab, selectedView);
+
+  // If showing full detail, render that instead of workbench
+  if (showFullDetail && (fullDetailPR || fullDetailPO)) {
+    return <PRPOFullDetail
+      pr={fullDetailPR}
+      po={fullDetailPO}
+      tab={fullDetailTab}
+      onTabChange={setFullDetailTab}
+      onBack={handleBackToWorkbench}
+      onAssign={(id, assignee) => {
+        if (fullDetailPR) handleAssignPR(id, assignee);
+        if (fullDetailPO) handleAssignPO(id, assignee);
+      }}
+      onRequestInfo={handleRequestInfo}
+    />;
+  }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-muted/20">
@@ -425,9 +471,10 @@ export function ProcurementModule() {
                             <tr
                               key={pr.id}
                               className={cn(
-                                "border-b hover:bg-muted/50 transition-colors",
+                                "border-b hover:bg-muted/50 transition-colors cursor-pointer",
                                 selectedPR?.id === pr.id && "bg-muted/30"
                               )}
+                              onClick={() => handleRowClickPR(pr)}
                             >
                               {/* PR # */}
                               <td className="px-4 py-3 text-sm font-medium text-foreground">
@@ -484,7 +531,7 @@ export function ProcurementModule() {
                               </td>
                               {/* Actions */}
                               <td className="px-4 py-3 text-sm">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                                   <Button
                                     size="sm"
                                     variant="outline"
@@ -607,9 +654,10 @@ export function ProcurementModule() {
                             <tr
                               key={po.id}
                               className={cn(
-                                "border-b hover:bg-muted/50 transition-colors",
+                                "border-b hover:bg-muted/50 transition-colors cursor-pointer",
                                 selectedPO?.id === po.id && "bg-muted/30"
                               )}
+                              onClick={() => handleRowClickPO(po)}
                             >
                               {/* PO # */}
                               <td className="px-4 py-3 text-sm font-medium text-foreground">
@@ -662,7 +710,7 @@ export function ProcurementModule() {
                               </td>
                               {/* Actions */}
                               <td className="px-4 py-3 text-sm">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                                   <Button
                                     size="sm"
                                     variant="outline"
