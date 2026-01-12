@@ -82,28 +82,35 @@ export function ProcurementModule() {
   const emptyState = getEmptyStateText(activeTab, selectedView);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-background">
-      {/* Header */}
-      <div className="border-b bg-card px-8 py-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Procurement Console
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Triage requests and orders across systems
-        </p>
-      </div>
-
+    <div className="flex-1 flex flex-col overflow-hidden bg-muted/20">
       {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Primary Workspace */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex overflow-hidden p-4">
+        {/* Primary Workspace Card */}
+        <Card className="flex-1 flex flex-col shadow-lg border-border/50">
+          {/* Header */}
+          <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-8 py-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Filter className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                  Procurement Console
+                </h1>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Triage requests and orders across systems
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Tabs */}
           <Tabs
             value={activeTab}
             onValueChange={(value) => setActiveTab(value as WorkbenchTab)}
-            className="flex-1 flex flex-col"
+            className="flex-1 flex flex-col overflow-hidden"
           >
-            <div className="border-b bg-card px-8">
+            <div className="border-b bg-background/95 px-8">
               <TabsList className="bg-transparent">
                 <TabsTrigger value="pr" className="data-[state=active]:bg-background">
                   PR Workbench (Requests)
@@ -115,8 +122,8 @@ export function ProcurementModule() {
             </div>
 
             {/* Shared Controls Row */}
-            <div className="border-b bg-card px-8 py-4">
-              <div className="flex items-center gap-4">
+            <div className="border-b bg-background/95 px-8 py-4">
+              <div className="flex items-center gap-4 flex-wrap">
                 {/* Views Dropdown */}
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">Views:</span>
@@ -167,158 +174,160 @@ export function ProcurementModule() {
             </div>
 
             {/* Tab Content */}
-            <div className="flex-1 overflow-auto p-8">
-              <TabsContent value="pr" className="mt-0 h-full">
-                <Card className="h-full flex flex-col">
-                  <CardContent className="p-0 flex-1 flex flex-col">
-                    {/* PR Table */}
-                    <div className="overflow-auto flex-1">
-                      <table className="w-full">
-                        <thead className="border-b bg-muted/50">
-                          <tr>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
-                              PR #
-                            </th>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
-                              Title / Line summary
-                            </th>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
-                              Phase / Step
-                            </th>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
-                              Blocker / Exception
-                            </th>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
-                              Age / SLA
-                            </th>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
-                              Amount
-                            </th>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
-                              Requester
-                            </th>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
-                              Assignee / Queue
-                            </th>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
-                              Actions
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {/* Empty state */}
-                          <tr>
-                            <td colSpan={9} className="px-4 py-16 text-center">
-                              <div className="flex flex-col items-center gap-3 max-w-md mx-auto">
-                                <Filter className="h-12 w-12 text-muted-foreground/50" />
-                                <div>
-                                  <h3 className="text-lg font-semibold text-foreground mb-1">
-                                    {emptyState.title}
-                                  </h3>
-                                  <p className="text-sm text-muted-foreground">
-                                    {emptyState.subtitle}
-                                  </p>
-                                  {emptyState.helper && (
-                                    <p className="text-xs text-muted-foreground mt-2">
-                                      {emptyState.helper}
-                                    </p>
-                                  )}
-                                </div>
+            <div className="flex-1 overflow-hidden">
+              <TabsContent value="pr" className="h-full m-0 p-8 overflow-auto">
+                <div className="bg-background rounded-lg border shadow-sm">
+                  {/* PR Table */}
+                  <div className="overflow-auto">
+                    <table className="w-full">
+                      <thead className="border-b bg-muted/50">
+                        <tr>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
+                            PR #
+                          </th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
+                            Title / Line summary
+                          </th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
+                            Phase / Step
+                          </th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
+                            Blocker / Exception
+                          </th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
+                            Age / SLA
+                          </th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
+                            Amount
+                          </th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
+                            Requester
+                          </th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
+                            Assignee / Queue
+                          </th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {/* Empty state */}
+                        <tr>
+                          <td colSpan={9} className="px-4 py-16 text-center">
+                            <div className="flex flex-col items-center gap-3 max-w-md mx-auto">
+                              <div className="p-4 rounded-full bg-muted/30">
+                                <Filter className="h-8 w-8 text-muted-foreground/50" />
                               </div>
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </CardContent>
-                </Card>
+                              <div>
+                                <h3 className="text-lg font-semibold text-foreground mb-1">
+                                  {emptyState.title}
+                                </h3>
+                                <p className="text-sm text-muted-foreground">
+                                  {emptyState.subtitle}
+                                </p>
+                                {emptyState.helper && (
+                                  <p className="text-xs text-muted-foreground mt-2">
+                                    {emptyState.helper}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </TabsContent>
 
-              <TabsContent value="po" className="mt-0 h-full">
-                <Card className="h-full flex flex-col">
-                  <CardContent className="p-0 flex-1 flex flex-col">
-                    {/* PO Table */}
-                    <div className="overflow-auto flex-1">
-                      <table className="w-full">
-                        <thead className="border-b bg-muted/50">
-                          <tr>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
-                              PO #
-                            </th>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
-                              Supplier
-                            </th>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
-                              Phase / Step
-                            </th>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
-                              Failure reason
-                            </th>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
-                              Age / SLA
-                            </th>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
-                              Amount
-                            </th>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
-                              Assignee / Resolver group
-                            </th>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
-                              Actions
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {/* Empty state */}
-                          <tr>
-                            <td colSpan={8} className="px-4 py-16 text-center">
-                              <div className="flex flex-col items-center gap-3 max-w-md mx-auto">
-                                <Filter className="h-12 w-12 text-muted-foreground/50" />
-                                <div>
-                                  <h3 className="text-lg font-semibold text-foreground mb-1">
-                                    {emptyState.title}
-                                  </h3>
-                                  <p className="text-sm text-muted-foreground">
-                                    {emptyState.subtitle}
-                                  </p>
-                                  {emptyState.helper && (
-                                    <p className="text-xs text-muted-foreground mt-2">
-                                      {emptyState.helper}
-                                    </p>
-                                  )}
-                                </div>
+              <TabsContent value="po" className="h-full m-0 p-8 overflow-auto">
+                <div className="bg-background rounded-lg border shadow-sm">
+                  {/* PO Table */}
+                  <div className="overflow-auto">
+                    <table className="w-full">
+                      <thead className="border-b bg-muted/50">
+                        <tr>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
+                            PO #
+                          </th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
+                            Supplier
+                          </th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
+                            Phase / Step
+                          </th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
+                            Failure reason
+                          </th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
+                            Age / SLA
+                          </th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
+                            Amount
+                          </th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
+                            Assignee / Resolver group
+                          </th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {/* Empty state */}
+                        <tr>
+                          <td colSpan={8} className="px-4 py-16 text-center">
+                            <div className="flex flex-col items-center gap-3 max-w-md mx-auto">
+                              <div className="p-4 rounded-full bg-muted/30">
+                                <Filter className="h-8 w-8 text-muted-foreground/50" />
                               </div>
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </CardContent>
-                </Card>
+                              <div>
+                                <h3 className="text-lg font-semibold text-foreground mb-1">
+                                  {emptyState.title}
+                                </h3>
+                                <p className="text-sm text-muted-foreground">
+                                  {emptyState.subtitle}
+                                </p>
+                                {emptyState.helper && (
+                                  <p className="text-xs text-muted-foreground mt-2">
+                                    {emptyState.helper}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </TabsContent>
             </div>
           </Tabs>
-        </div>
+        </Card>
 
         {/* Detail Panel Placeholder */}
         {showDetailPanel && (
-          <div className="w-96 border-l bg-card p-6 overflow-auto">
-            <div className="flex flex-col items-center justify-center h-full text-center">
-              <h3 className="text-lg font-semibold text-foreground mb-2">
-                Select an item
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Details, validations, and audit trail will appear here.
-              </p>
-            </div>
-          </div>
+          <Card className="w-96 ml-4 shadow-lg border-border/50">
+            <CardContent className="p-6">
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <h3 className="text-lg font-semibold text-foreground mb-2">
+                  Select an item
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Details, validations, and audit trail will appear here.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
 
       {/* Floating Assistant Button */}
       <Button
         size="lg"
-        className="fixed bottom-6 right-6 rounded-full h-14 w-14 shadow-lg"
+        className="fixed bottom-6 right-6 rounded-full h-14 w-14 shadow-lg z-30"
         onClick={() => setShowAssistant(true)}
         title="Assistant"
       >
@@ -335,10 +344,18 @@ export function ProcurementModule() {
           />
 
           {/* Drawer */}
-          <div className="fixed right-0 top-0 bottom-0 w-96 bg-card border-l shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
+          <div className="fixed right-0 top-0 bottom-0 w-96 bg-background border-l shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
             {/* Header */}
-            <div className="border-b px-6 py-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Procurement Assistant</h2>
+            <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <MessageCircle className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-foreground">Procurement Assistant</h2>
+                  <p className="text-xs text-muted-foreground">Ask about your queue</p>
+                </div>
+              </div>
               <Button
                 variant="ghost"
                 size="icon"
@@ -351,25 +368,27 @@ export function ProcurementModule() {
             {/* Chat Area */}
             <div className="flex-1 overflow-auto p-6">
               <div className="flex flex-col items-center justify-center h-full text-center">
-                <MessageCircle className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                <p className="text-sm text-muted-foreground mb-2">
+                <div className="p-4 rounded-full bg-muted/30 mb-4">
+                  <MessageCircle className="h-8 w-8 text-muted-foreground/50" />
+                </div>
+                <p className="text-sm text-muted-foreground mb-3">
                   Ask me anything about your procurement queue:
                 </p>
-                <div className="text-xs text-muted-foreground space-y-1">
-                  <p>"What needs attention?"</p>
-                  <p>"Why is this blocked?"</p>
-                  <p>"Show SLA-breached PRs."</p>
+                <div className="text-xs text-muted-foreground space-y-2 bg-muted/30 rounded-lg p-4 max-w-xs">
+                  <p className="font-medium">"What needs attention?"</p>
+                  <p className="font-medium">"Why is this blocked?"</p>
+                  <p className="font-medium">"Show SLA-breached PRs."</p>
                 </div>
               </div>
             </div>
 
             {/* Input Box */}
-            <div className="border-t p-4">
+            <div className="border-t bg-background/95 p-4">
               <div className="flex gap-2">
                 <input
                   type="text"
                   placeholder="Ask about procurement items..."
-                  className="flex-1 px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="flex-1 px-3 py-2 bg-background border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   disabled
                 />
                 <Button disabled>Send</Button>
