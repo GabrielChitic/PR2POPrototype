@@ -62,6 +62,14 @@ export function ProcurementModule() {
     { id: "high-value", label: "High value", active: false },
   ]);
   const [showAssistant, setShowAssistant] = useState(false);
+  // Step 7: Assistant messages state
+  const [assistantMessages, setAssistantMessages] = useState<Array<{
+    id: string;
+    role: "user" | "assistant";
+    content: string;
+    actions?: Array<{ label: string; onClick: () => void }>;
+  }>>([]);
+  const [assistantInput, setAssistantInput] = useState("");
   const [showDetailPanel, setShowDetailPanel] = useState(false);
   const [selectedPR, setSelectedPR] = useState<ProcurementPR | null>(null);
   const [selectedPO, setSelectedPO] = useState<ProcurementPO | null>(null);
@@ -821,6 +829,177 @@ export function ProcurementModule() {
     }
   };
 
+  // Step 7: Assistant command handler
+  const handleAssistantCommand = (userInput: string) => {
+    const input = userInput.trim().toLowerCase();
+    const userMessageId = `user-${Date.now()}`;
+    const assistantMessageId = `assistant-${Date.now()}`;
+
+    // Add user message
+    setAssistantMessages((prev) => [
+      ...prev,
+      { id: userMessageId, role: "user", content: userInput },
+    ]);
+
+    // Parse and execute command
+    if (input.includes("what needs attention") || input === "needs attention") {
+      // A1: What needs attention
+      setSelectedView("attention");
+      const prCount = prs.filter((pr) => pr.exception || pr.hold || pr.topBlocker).length;
+      const poCount = pos.filter((po) => po.exception || po.dispatchFailed || po.failureReason).length;
+
+      setAssistantMessages((prev) => [
+        ...prev,
+        {
+          id: assistantMessageId,
+          role: "assistant",
+          content: `Showing items that need attention.\n\nPRs: ${prCount} · POs: ${poCount}`,
+          actions: [
+            {
+              label: "Open PR Needs Attention",
+              onClick: () => {
+                setActiveTab("pr");
+                setSelectedView("attention");
+              },
+            },
+            {
+              label: "Open PO Needs Attention",
+              onClick: () => {
+                setActiveTab("po");
+                setSelectedView("attention");
+              },
+            },
+          ],
+        },
+      ]);
+    } else if (input.includes("sla") && (input.includes("breach") || input.includes("breached"))) {
+      // A2: Show SLA-breached items
+      const breachedPRs = prs.filter((pr) => getPRSlaStatus(pr) === "Breached");
+      const breachedPOs = pos.filter((po) => getPOSlaStatus(po) === "Breached");
+      const top3 = [...breachedPRs.map((pr) => pr.prNumber), ...breachedPOs.map((po) => po.poNumber)].slice(0, 3);
+
+      setAssistantMessages((prev) => [
+        ...prev,
+        {
+          id: assistantMessageId,
+          role: "assistant",
+          content: `Showing SLA-breached items.\n\nFound: ${breachedPRs.length} PRs, ${breachedPOs.length} POs\n\nTop items: ${top3.join(", ") || "None"}`,
+        },
+      ]);
+    } else if (input.includes("dispatch") && input.includes("fail")) {
+      // A3: Show dispatch failures
+      setActiveTab("po");
+      const failedPOs = pos.filter((po) => po.dispatchFailed || po.dispatchStatus === "Failed");
+      const top3 = failedPOs.slice(0, 3).map((po) => po.poNumber);
+
+      setAssistantMessages((prev) => [
+        ...prev,
+        {
+          id: assistantMessageId,
+          role: "assistant",
+          content: `Showing POs with dispatch failures.\n\nFound: ${failedPOs.length} POs\n\nTop items: ${top3.join(", ") || "None"}`,
+        },
+      ]);
+    } else if (input.includes("why") && input.includes("block")) {
+      // A4: Why is this blocked (contextual)
+      if (fullDetailPR) {
+        const blocker = fullDetailPR.topBlocker || "No blocker found";
+        setAssistantMessages((prev) => [
+          ...prev,
+          {
+            id: assistantMessageId,
+            role: "assistant",
+            content: `This PR is blocked because: ${blocker}`,
+          },
+        ]);
+      } else if (fullDetailPO && fullDetailPO.failureReason) {
+        setAssistantMessages((prev) => [
+          ...prev,
+          {
+            id: assistantMessageId,
+            role: "assistant",
+            content: `This PO has a failure: ${fullDetailPO.failureReason}`,
+          },
+        ]);
+      } else {
+        setAssistantMessages((prev) => [
+          ...prev,
+          {
+            id: assistantMessageId,
+            role: "assistant",
+            content: "Open a PR first (e.g., 'Open PR-6729') and I'll explain the blocker.",
+          },
+        ]);
+      }
+    } else if (input.match(/open\s+pr[-\s]*(\d+)/)) {
+      // B1: Open PR-####
+      const match = input.match(/open\s+pr[-\s]*(\d+)/);
+      const prNumber = `PR-${match![1]}`;
+      const pr = prs.find((p) => p.prNumber === prNumber);
+
+      if (pr) {
+        handleOpenPR(pr);
+        setAssistantMessages((prev) => [
+          ...prev,
+          {
+            id: assistantMessageId,
+            role: "assistant",
+            content: `Opened ${prNumber}.\n\nPhase: ${pr.phaseStep}\nBlocker: ${pr.topBlocker || "None"}\nRequester: ${pr.requester}\nAmount: ${pr.currency} ${pr.amount.toLocaleString()}`,
+          },
+        ]);
+      } else {
+        const availablePRs = prs.slice(0, 3).map((p) => p.prNumber).join(", ");
+        setAssistantMessages((prev) => [
+          ...prev,
+          {
+            id: assistantMessageId,
+            role: "assistant",
+            content: `I can't find ${prNumber}. Try one of: ${availablePRs}`,
+          },
+        ]);
+      }
+    } else if (input.match(/open\s+po[-\s]*(\d+)/)) {
+      // B2: Open PO-####
+      const match = input.match(/open\s+po[-\s]*(\d+)/);
+      const poNumber = `PO-${match![1]}`;
+      const po = pos.find((p) => p.poNumber === poNumber);
+
+      if (po) {
+        handleOpenPO(po);
+        setAssistantMessages((prev) => [
+          ...prev,
+          {
+            id: assistantMessageId,
+            role: "assistant",
+            content: `Opened ${poNumber}.\n\nPhase: ${po.phaseStep}\nFailure: ${po.failureReason || "None"}\nSupplier: ${po.supplier}\nAmount: ${po.currency} ${po.amount.toLocaleString()}`,
+          },
+        ]);
+      } else {
+        const availablePOs = pos.slice(0, 3).map((p) => p.poNumber).join(", ");
+        setAssistantMessages((prev) => [
+          ...prev,
+          {
+            id: assistantMessageId,
+            role: "assistant",
+            content: `I can't find ${poNumber}. Try one of: ${availablePOs}`,
+          },
+        ]);
+      }
+    } else {
+      // Unknown command
+      setAssistantMessages((prev) => [
+        ...prev,
+        {
+          id: assistantMessageId,
+          role: "assistant",
+          content: "I didn't understand that. Try:\n• What needs attention?\n• Show SLA-breached items\n• Show dispatch failures\n• Open PR-6729\n• Open PO-6656\n• Why is this blocked?",
+        },
+      ]);
+    }
+
+    setAssistantInput("");
+  };
+
   const getEmptyStateText = (workbench: WorkbenchTab, view: ViewFilter) => {
     if (workbench === "pr") {
       if (view === "all") {
@@ -1000,16 +1179,13 @@ export function ProcurementModule() {
                             Phase / Step
                           </th>
                           <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
-                            Blocker / Exception
+                            Reason
                           </th>
                           <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
                             Age / SLA
                           </th>
                           <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
                             Amount
-                          </th>
-                          <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
-                            Requester
                           </th>
                           <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
                             Assignee / Queue
@@ -1022,7 +1198,7 @@ export function ProcurementModule() {
                       <tbody>
                         {filteredPRs.length === 0 ? (
                           <tr>
-                            <td colSpan={9} className="px-4 py-16 text-center">
+                            <td colSpan={8} className="px-4 py-16 text-center">
                               <div className="flex flex-col items-center gap-3 max-w-md mx-auto">
                                 <div className="p-4 rounded-full bg-muted/30">
                                   <Filter className="h-8 w-8 text-muted-foreground/50" />
@@ -1057,9 +1233,14 @@ export function ProcurementModule() {
                               <td className="px-4 py-3 text-sm font-medium text-foreground">
                                 {pr.prNumber}
                               </td>
-                              {/* Title / Line summary */}
-                              <td className="px-4 py-3 text-sm text-foreground max-w-xs">
-                                {pr.title}
+                              {/* Title / Line summary - Step 6A: Two-line pattern */}
+                              <td className="px-4 py-3 max-w-xs">
+                                <div className="text-sm font-medium text-foreground leading-tight">
+                                  {pr.title}
+                                </div>
+                                <div className="text-xs text-muted-foreground mt-1 leading-tight">
+                                  {pr.requester}
+                                </div>
                               </td>
                               {/* Phase / Step */}
                               <td className="px-4 py-3 text-sm">
@@ -1067,60 +1248,55 @@ export function ProcurementModule() {
                                   {pr.phaseStep}
                                 </Badge>
                               </td>
-                              {/* Reason / Next Action (Step 6) */}
-                              <td className="px-4 py-3 text-sm">
+                              {/* Reason / Next Action - Step 6A: Clean compact format */}
+                              <td className="px-4 py-3">
                                 {getPRReason(pr) ? (
-                                  <div className="space-y-1">
+                                  <div>
                                     <Badge
                                       variant={pr.topBlocker ? "destructive" : pr.hold ? "secondary" : "default"}
-                                      className="text-xs"
+                                      className="text-xs font-normal"
                                     >
                                       {getPRReason(pr)}
                                     </Badge>
-                                    {getPRNextAction(pr) && (
-                                      <div className="text-xs text-muted-foreground">
+                                    {(pr.topBlocker || pr.hold) && getPRNextAction(pr) && (
+                                      <div className="text-xs text-muted-foreground mt-1 leading-tight">
                                         {getPRNextAction(pr)}
                                       </div>
                                     )}
                                   </div>
                                 ) : (
-                                  <span className="text-muted-foreground">—</span>
+                                  <span className="text-xs text-muted-foreground">—</span>
                                 )}
                               </td>
-                              {/* Age / SLA (Step 6) */}
-                              <td className="px-4 py-3 text-sm">
-                                <div className="space-y-1">
-                                  <div className="text-foreground">{pr.age}</div>
-                                  <Badge
-                                    variant={
-                                      getPRSlaStatus(pr) === "Breached"
-                                        ? "destructive"
-                                        : getPRSlaStatus(pr) === "At risk"
-                                        ? "secondary"
-                                        : "outline"
-                                    }
-                                    className="text-xs"
+                              {/* Age / SLA - Step 6A: Single-line format */}
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                                  <span>{pr.age}</span>
+                                  <span className="text-muted-foreground">·</span>
+                                  <span
+                                    className={cn(
+                                      "text-xs",
+                                      getPRSlaStatus(pr) === "Breached" && "text-red-600",
+                                      getPRSlaStatus(pr) === "At risk" && "text-amber-600",
+                                      getPRSlaStatus(pr) === "On track" && "text-muted-foreground"
+                                    )}
                                   >
                                     {getPRSlaStatus(pr)}
-                                  </Badge>
+                                  </span>
                                 </div>
                               </td>
-                              {/* Amount */}
+                              {/* Amount - Step 6A: Consistent typography */}
                               <td className="px-4 py-3 text-sm font-medium text-foreground">
                                 {pr.currency} {pr.amount.toLocaleString()}
                               </td>
-                              {/* Requester */}
-                              <td className="px-4 py-3 text-sm text-foreground">
-                                {pr.requester}
-                              </td>
-                              {/* Assignee / Queue */}
-                              <td className="px-4 py-3 text-sm">
+                              {/* Assignee / Queue - Step 6A: Simplified */}
+                              <td className="px-4 py-3">
                                 {pr.unassigned ? (
-                                  <Badge variant="secondary" className="text-xs">
+                                  <Badge variant="secondary" className="text-xs font-normal">
                                     Unassigned
                                   </Badge>
                                 ) : (
-                                  <span className="text-foreground">{pr.assigneeOrQueue}</span>
+                                  <span className="text-sm text-foreground">{pr.assigneeOrQueue}</span>
                                 )}
                               </td>
                               {/* Actions */}
@@ -1200,13 +1376,10 @@ export function ProcurementModule() {
                             Supplier
                           </th>
                           <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
-                            Source PR
-                          </th>
-                          <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
                             Phase / Step
                           </th>
                           <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
-                            Failure reason
+                            Reason
                           </th>
                           <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
                             Age / SLA
@@ -1225,7 +1398,7 @@ export function ProcurementModule() {
                       <tbody>
                         {filteredPOs.length === 0 ? (
                           <tr>
-                            <td colSpan={9} className="px-4 py-16 text-center">
+                            <td colSpan={8} className="px-4 py-16 text-center">
                               <div className="flex flex-col items-center gap-3 max-w-md mx-auto">
                                 <div className="p-4 rounded-full bg-muted/30">
                                   <Filter className="h-8 w-8 text-muted-foreground/50" />
@@ -1260,16 +1433,15 @@ export function ProcurementModule() {
                               <td className="px-4 py-3 text-sm font-medium text-foreground">
                                 {po.poNumber}
                               </td>
-                              {/* Supplier */}
-                              <td className="px-4 py-3 text-sm text-foreground">
-                                {po.supplier}
-                              </td>
-                              {/* Source PR */}
-                              <td className="px-4 py-3 text-sm text-muted-foreground">
-                                {po.sourcePrNumber ? (
-                                  <span className="text-foreground">{po.sourcePrNumber}</span>
-                                ) : (
-                                  <span>—</span>
+                              {/* Supplier - Step 6A: Two-line pattern */}
+                              <td className="px-4 py-3 max-w-xs">
+                                <div className="text-sm font-medium text-foreground leading-tight">
+                                  {po.supplier}
+                                </div>
+                                {po.sourcePrNumber && (
+                                  <div className="text-xs text-muted-foreground mt-1 leading-tight">
+                                    from {po.sourcePrNumber}
+                                  </div>
                                 )}
                               </td>
                               {/* Phase / Step */}
@@ -1278,10 +1450,10 @@ export function ProcurementModule() {
                                   {po.phaseStep}
                                 </Badge>
                               </td>
-                              {/* Reason / Next Action (Step 6) */}
-                              <td className="px-4 py-3 text-sm max-w-xs">
+                              {/* Reason / Next Action - Step 6A: Clean compact format */}
+                              <td className="px-4 py-3 max-w-xs">
                                 {getPOReason(po) ? (
-                                  <div className="space-y-1">
+                                  <div>
                                     <Badge
                                       variant={
                                         po.failureReason || po.dispatchStatus === "Failed"
@@ -1290,50 +1462,49 @@ export function ProcurementModule() {
                                           ? "secondary"
                                           : "default"
                                       }
-                                      className="text-xs"
+                                      className="text-xs font-normal"
                                     >
                                       {getPOReason(po)}
                                     </Badge>
-                                    {getPONextAction(po) && (
-                                      <div className="text-xs text-muted-foreground">
+                                    {(po.failureReason || po.dispatchStatus === "Failed" || po.confirmationStatus === "DEVIATION" || po.changeStatus === "PENDING") && getPONextAction(po) && (
+                                      <div className="text-xs text-muted-foreground mt-1 leading-tight">
                                         {getPONextAction(po)}
                                       </div>
                                     )}
                                   </div>
                                 ) : (
-                                  <span className="text-muted-foreground">—</span>
+                                  <span className="text-xs text-muted-foreground">—</span>
                                 )}
                               </td>
-                              {/* Age / SLA (Step 6) */}
-                              <td className="px-4 py-3 text-sm">
-                                <div className="space-y-1">
-                                  <div className="text-foreground">{po.age}</div>
-                                  <Badge
-                                    variant={
-                                      getPOSlaStatus(po) === "Breached"
-                                        ? "destructive"
-                                        : getPOSlaStatus(po) === "At risk"
-                                        ? "secondary"
-                                        : "outline"
-                                    }
-                                    className="text-xs"
+                              {/* Age / SLA - Step 6A: Single-line format */}
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                                  <span>{po.age}</span>
+                                  <span className="text-muted-foreground">·</span>
+                                  <span
+                                    className={cn(
+                                      "text-xs",
+                                      getPOSlaStatus(po) === "Breached" && "text-red-600",
+                                      getPOSlaStatus(po) === "At risk" && "text-amber-600",
+                                      getPOSlaStatus(po) === "On track" && "text-muted-foreground"
+                                    )}
                                   >
                                     {getPOSlaStatus(po)}
-                                  </Badge>
+                                  </span>
                                 </div>
                               </td>
-                              {/* Amount */}
+                              {/* Amount - Step 6A: Consistent typography */}
                               <td className="px-4 py-3 text-sm font-medium text-foreground">
                                 {po.currency} {po.amount.toLocaleString()}
                               </td>
-                              {/* Assignee / Resolver group */}
-                              <td className="px-4 py-3 text-sm">
+                              {/* Assignee / Resolver group - Step 6A: Simplified */}
+                              <td className="px-4 py-3">
                                 {po.unassigned ? (
-                                  <Badge variant="secondary" className="text-xs">
+                                  <Badge variant="secondary" className="text-xs font-normal">
                                     Unassigned
                                   </Badge>
                                 ) : (
-                                  <span className="text-foreground">{po.assigneeOrResolverGroup}</span>
+                                  <span className="text-sm text-foreground">{po.assigneeOrResolverGroup}</span>
                                 )}
                               </td>
                               {/* Actions */}
@@ -1647,33 +1818,84 @@ export function ProcurementModule() {
               </Button>
             </div>
 
-            {/* Chat Area */}
+            {/* Chat Area - Step 7: Message rendering */}
             <div className="flex-1 overflow-auto p-6">
-              <div className="flex flex-col items-center justify-center h-full text-center">
-                <div className="p-4 rounded-full bg-muted/30 mb-4">
-                  <MessageCircle className="h-8 w-8 text-muted-foreground/50" />
+              {assistantMessages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center">
+                  <div className="p-4 rounded-full bg-muted/30 mb-4">
+                    <MessageCircle className="h-8 w-8 text-muted-foreground/50" />
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Ask me anything about your procurement queue:
+                  </p>
+                  <div className="text-xs text-muted-foreground space-y-2 bg-muted/30 rounded-lg p-4 max-w-xs">
+                    <p className="font-medium">"What needs attention?"</p>
+                    <p className="font-medium">"Open PR-6729"</p>
+                    <p className="font-medium">"Show dispatch failures"</p>
+                  </div>
                 </div>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Ask me anything about your procurement queue:
-                </p>
-                <div className="text-xs text-muted-foreground space-y-2 bg-muted/30 rounded-lg p-4 max-w-xs">
-                  <p className="font-medium">"What needs attention?"</p>
-                  <p className="font-medium">"Why is this blocked?"</p>
-                  <p className="font-medium">"Show SLA-breached PRs."</p>
+              ) : (
+                <div className="space-y-4">
+                  {assistantMessages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={cn(
+                        "flex",
+                        message.role === "user" ? "justify-end" : "justify-start"
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "max-w-[85%] rounded-lg px-4 py-2.5 text-sm",
+                          message.role === "user"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-foreground"
+                        )}
+                      >
+                        <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                        {message.actions && message.actions.length > 0 && (
+                          <div className="flex flex-col gap-2 mt-3 pt-3 border-t border-border/40">
+                            {message.actions.map((action, idx) => (
+                              <Button
+                                key={idx}
+                                size="sm"
+                                variant="outline"
+                                className="justify-start text-xs h-8"
+                                onClick={action.onClick}
+                              >
+                                {action.label}
+                              </Button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
+              )}
             </div>
 
-            {/* Input Box */}
+            {/* Input Box - Step 7: Enabled with handler */}
             <div className="border-t bg-background/95 p-4">
               <div className="flex gap-2">
                 <input
                   type="text"
                   placeholder="Ask about procurement items..."
                   className="flex-1 px-3 py-2 bg-background border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  disabled
+                  value={assistantInput}
+                  onChange={(e) => setAssistantInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && assistantInput.trim()) {
+                      handleAssistantCommand(assistantInput);
+                    }
+                  }}
                 />
-                <Button disabled>Send</Button>
+                <Button
+                  onClick={() => assistantInput.trim() && handleAssistantCommand(assistantInput)}
+                  disabled={!assistantInput.trim()}
+                >
+                  Send
+                </Button>
               </div>
             </div>
           </div>
