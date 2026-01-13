@@ -32,6 +32,11 @@ export function RequesterModuleV2() {
   const [chatInput, setChatInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // PDF upload state
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [isProcessingPDF, setIsProcessingPDF] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Draft PR state
   const [draft, setDraft] = useState<DraftPR>({
     draftId: `draft-${Date.now()}`,
@@ -441,6 +446,55 @@ export function RequesterModuleV2() {
   // Stage 1 Shortcuts: Handle optimization commands
   const handleStage1Shortcuts = (message: string, messageLower: string): boolean => {
     const qty = draft.inferredQuantity || 1;
+    const isNonCatalog = draft.journeyType === "NON_CATALOG";
+    const quoteLine = draft.lineItems[0]; // For NON_CATALOG, there's always exactly one line
+
+    // NON_CATALOG specific commands
+    if (isNonCatalog && quoteLine) {
+      // "make it X" - update quantity
+      const makeItMatch = message.match(/make it\s+(\d+)/i);
+      if (makeItMatch) {
+        const newQty = parseInt(makeItMatch[1], 10);
+        handleUpdateQuantity(quoteLine.id, newQty);
+        addChatMessage("assistant", `Updated quantity to ${newQty} in the panel.`);
+        return true;
+      }
+
+      // "set price to X" - update price
+      const setPriceMatch = message.match(/set price to\s+(\d+(?:\.\d+)?)/i);
+      if (setPriceMatch) {
+        const newPrice = parseFloat(setPriceMatch[1]);
+        // Update price by recreating the line item
+        const updatedLine: CatalogItem = {
+          id: quoteLine.id,
+          name: quoteLine.name,
+          description: quoteLine.description,
+          category: quoteLine.category || "General",
+          unitPrice: newPrice,
+          currency: quoteLine.currency || "EUR",
+          unitOfMeasure: quoteLine.unitOfMeasure,
+          supplier: quoteLine.supplier,
+          supplierName: quoteLine.supplier,
+          isPreferredSupplier: false,
+          keywords: [],
+          compliance: {
+            preferred: false,
+            contractStatus: "missing",
+            allowed: true,
+          },
+        };
+        handleRemoveItem(quoteLine.id);
+        handleAddItem(updatedLine, quoteLine.quantity);
+        addChatMessage("assistant", `Updated unit price to ${quoteLine.currency || "EUR"} ${newPrice.toFixed(2)} in the panel.`);
+        return true;
+      }
+
+      // "continue" - navigate to next stage
+      if (messageLower === "continue" || messageLower === "next" || messageLower.includes("continue")) {
+        handleStep1Next();
+        return true;
+      }
+    }
 
     // Choose cheapest
     if (messageLower.includes("cheapest") || messageLower.includes("lowest cost") || messageLower.includes("lowest price")) {
@@ -649,8 +703,8 @@ export function RequesterModuleV2() {
     addChatMessage("user", userMessage);
 
     // Context-aware responses based on current step
-    if (currentStep === 1 && catalogResults.length > 0) {
-      // Stage 1: Handle shortcuts like "choose cheapest", "choose preferred", etc.
+    if (currentStep === 1 && (catalogResults.length > 0 || draft.journeyType === "NON_CATALOG")) {
+      // Stage 1: Handle shortcuts like "choose cheapest", "choose preferred", "make it X", "set price to Y", etc.
       if (handleStage1Shortcuts(userMessage, messageLower)) {
         return; // Shortcut handled
       }
@@ -1182,50 +1236,103 @@ export function RequesterModuleV2() {
       });
     }
 
-    // Create lifecycle timeline
-    const lifecycleTimeline: LifecycleNode[] = [
-      {
-        id: "lc-1",
-        label: "Submitted",
-        status: "completed",
-        completedAt: submissionTimestamp,
-      },
-      {
-        id: "lc-2",
-        label: "Manager approval",
-        owner: "Sarah Johnson",
-        status: "in_progress",
-        helperText: "Waiting on Sarah Johnson",
-      },
-      {
-        id: "lc-3",
-        label: "Cost center owner approval",
-        owner: "Michael Chen",
-        status: "pending",
-      },
-    ];
+    // Create lifecycle timeline - different for R2 (NON_CATALOG)
+    const isNonCatalog = draft.journeyType === "NON_CATALOG";
+    let lifecycleTimeline: LifecycleNode[] = [];
+    let currentStep = "";
+    let currentOwner = "";
 
-    if (totalValue > 10000) {
-      lifecycleTimeline.push({
-        id: "lc-4",
-        label: "Procurement review",
-        owner: "Emily Rodriguez",
-        status: "pending",
-      });
-    }
+    if (isNonCatalog) {
+      // R2: NON_CATALOG timeline with Buyer action step
+      lifecycleTimeline = [
+        {
+          id: "lc-1",
+          label: "Submitted",
+          status: "completed",
+          completedAt: submissionTimestamp,
+        },
+        {
+          id: "lc-2",
+          label: "Buyer action (Procurement review)",
+          owner: "IT Procurement Queue",
+          status: "in_progress",
+          helperText: "Validating quote, supplier record, and coding",
+        },
+        {
+          id: "lc-3",
+          label: "Manager approval",
+          owner: "Sarah Johnson",
+          status: "pending",
+        },
+        {
+          id: "lc-4",
+          label: "Cost center owner approval",
+          owner: "Michael Chen",
+          status: "pending",
+        },
+        {
+          id: "lc-5",
+          label: "PR approved",
+          status: "pending",
+        },
+        {
+          id: "lc-6",
+          label: "PO created & sent",
+          status: "pending",
+        },
+      ];
 
-    lifecycleTimeline.push(
-      {
-        id: "lc-5",
-        label: "PR approved",
-        status: "pending",
-      },
-      {
-        id: "lc-6",
-        label: "PO created & sent",
-        status: "pending",
+      currentStep = "Buyer action — Procurement review";
+      currentOwner = "IT Procurement Queue";
+    } else {
+      // R1: CATALOG timeline (original)
+      lifecycleTimeline = [
+        {
+          id: "lc-1",
+          label: "Submitted",
+          status: "completed",
+          completedAt: submissionTimestamp,
+        },
+        {
+          id: "lc-2",
+          label: "Manager approval",
+          owner: "Sarah Johnson",
+          status: "in_progress",
+          helperText: "Waiting on Sarah Johnson",
+        },
+        {
+          id: "lc-3",
+          label: "Cost center owner approval",
+          owner: "Michael Chen",
+          status: "pending",
+        },
+      ];
+
+      if (totalValue > 10000) {
+        lifecycleTimeline.push({
+          id: "lc-4",
+          label: "Procurement review",
+          owner: "Emily Rodriguez",
+          status: "pending",
+        });
       }
-    );
+
+      lifecycleTimeline.push(
+        {
+          id: "lc-5",
+          label: "PR approved",
+          status: "pending",
+        },
+        {
+          id: "lc-6",
+          label: "PO created & sent",
+          status: "pending",
+        }
+      );
+
+      currentStep = "Manager approval";
+      currentOwner = "Sarah Johnson";
+    }
 
     // Create compact summaries
     const itemsSummary =
@@ -1250,11 +1357,29 @@ export function RequesterModuleV2() {
       }
     });
 
-    // Generate title
-    const title =
-      draft.lineItems.length === 1
-        ? `${draft.lineItems[0].quantity} ${draft.lineItems[0].name}`
-        : `${totalQuantity} items`;
+    // Generate title - different for R2
+    let title = "";
+    if (isNonCatalog) {
+      // R2: Extract item name and location for more descriptive title
+      const itemName = draft.lineItems[0]?.name || "Items";
+      // Extract short item name (e.g., "Warning vests" from "Warning vest YELLOW w/reflex C470 S/M")
+      const shortItemName = itemName.split(" ").slice(0, 2).join(" ");
+      // Extract location (e.g., "Aarhus" from "Logistikvej 12, 8200 Aarhus N, Denmark")
+      const location = draft.purchaseInfo?.shipToAddress?.split(",").find(part =>
+        part.toLowerCase().includes("aarhus") ||
+        part.toLowerCase().includes("copenhagen") ||
+        part.toLowerCase().includes("denmark")
+      )?.trim() || "Aarhus";
+      const cityName = location.split(" ")[location.split(" ").length - 2] || location; // Get "Aarhus" from "8200 Aarhus N"
+
+      title = `${shortItemName} — ${cityName}`;
+    } else {
+      // R1: Original catalog title
+      title =
+        draft.lineItems.length === 1
+          ? `${draft.lineItems[0].quantity} ${draft.lineItems[0].name}`
+          : `${totalQuantity} items`;
+    }
 
     // Create SubmittedPR
     const submittedPR: SubmittedPR = {
@@ -1262,8 +1387,8 @@ export function RequesterModuleV2() {
       prId: draft.draftId,
       title,
       status: "pending_approval",
-      currentStep: "Manager approval",
-      currentOwner: "Sarah Johnson",
+      currentStep,
+      currentOwner,
       timeInStep: "Just now",
       submittedAt: submissionTimestamp,
       submittedBy: currentPersona.name,
@@ -1434,6 +1559,207 @@ export function RequesterModuleV2() {
     setIsPaneVisible(false);
   };
 
+  // PDF Upload Handlers (Journey R2: Non-Catalog PDF-first intake)
+  const handleFileSelect = (file: File) => {
+    // DEMO STUB: Recognize demo PDF by filename
+    const DEMO_PDF_FILENAME = "Manufacturing_AS_Quote_Q-2026-0113.pdf";
+
+    if (file.name !== DEMO_PDF_FILENAME) {
+      addChatMessage("assistant", `I can only process the demo quote file: "${DEMO_PDF_FILENAME}". Please upload that file to continue.`);
+      return;
+    }
+
+    // Add user message to trigger transition from hero landing to chat
+    addChatMessage("user", `📎 Uploaded: ${file.name}`);
+
+    // Start processing
+    setIsProcessingPDF(true);
+
+    // Show simulated processing messages with delays
+    setTimeout(() => {
+      addChatMessage("assistant", "📄 Quote received — analyzing document structure...");
+    }, 300);
+
+    setTimeout(() => {
+      addChatMessage("assistant", "🔍 Extracting line items, supplier info, and pricing...");
+    }, 1500);
+
+    setTimeout(() => {
+      addChatMessage("assistant", "✓ Extraction complete — creating purchase request from quote data.");
+    }, 3000);
+
+    // After 4 seconds, create the Draft PR with hardcoded data
+    setTimeout(() => {
+      // HARDCODED EXTRACTION DATA (NO OCR/PDF PARSING)
+      const extractedData = {
+        itemName: "Warning vest YELLOW w/reflex C470 S/M",
+        itemDescription: "Warning vest YELLOW w/reflex C470 S/M",
+        quantity: 50,
+        unitPrice: 35, // EUR 1,750 / 50 = EUR 35 per vest
+        totalPrice: 1750,
+        currency: "EUR",
+        supplierName: "Manufacturing A/S",
+        supplierLocation: "Aarhus, Denmark",
+        quoteName: "Q-2026-0113",
+        quoteDate: "2026-01-13",
+        quoteValidity: "14 days",
+        paymentTerms: "Net 30",
+        leadTime: "7–10 business days",
+        deliveryTerms: "DAP — Aarhus, Denmark (Receiving Dock)",
+      };
+
+      // Create Draft PR with NON_CATALOG journey
+      const newDraft: DraftPR = {
+        draftId: `DRAFT-PDF-${Date.now()}`,
+        title: `${extractedData.quantity} ${extractedData.itemName}`,
+        currentStep: 1, // Start at Stage 1
+        status: "DRAFT",
+        lineItems: [
+          {
+            id: `quote-line-${Date.now()}`,
+            type: "freeText", // Non-catalog item
+            name: extractedData.itemName,
+            description: extractedData.itemDescription,
+            quantity: extractedData.quantity,
+            unitPrice: extractedData.unitPrice,
+            totalPrice: extractedData.totalPrice,
+            unitOfMeasure: "EA",
+            supplier: extractedData.supplierName,
+            category: "Safety Equipment",
+            currency: extractedData.currency,
+            estimatedValue: extractedData.totalPrice,
+            preferredSupplier: extractedData.supplierName,
+            // No compliance info for quote-derived items
+          },
+        ],
+        purchaseInfo: {
+          usage: `Quote from ${extractedData.supplierName} - ${extractedData.quoteName}`,
+          isPartOfProject: false,
+          deliverTo: currentPersona.name,
+          deliverToLocation: currentPersona.location,
+          needByDate: "",
+          involvesPersonalData: false,
+          involvesThirdParty: true, // External supplier
+          requiresSpecialApproval: false,
+        },
+        requestType: "freeTextGoods", // Non-catalog journey
+        intentType: "freeText",
+        validationIssues: [],
+        approvalPath: [],
+        attachments: [],
+        requesterNotes: `Created from PDF quote: ${file.name}`,
+        uploadedFiles: [
+          {
+            id: `file-${Date.now()}`,
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            uploadedAt: new Date(),
+          },
+        ],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        // Phase 0 metadata
+        requestStatement: `Upload quote: ${file.name}`,
+        itemIntent: "safety equipment",
+        inferredQuantity: extractedData.quantity,
+        // Quote metadata for Stage 1
+        quoteDetails: {
+          supplierName: extractedData.supplierName,
+          quoteNumber: extractedData.quoteName,
+          quoteDate: extractedData.quoteDate,
+          currency: extractedData.currency,
+          validity: extractedData.quoteValidity,
+          paymentTerms: extractedData.paymentTerms,
+          leadTime: extractedData.leadTime,
+          deliveryTerms: extractedData.deliveryTerms,
+          supplierLocation: extractedData.supplierLocation,
+        },
+        journeyType: "NON_CATALOG", // Mark as non-catalog PDF journey
+      };
+
+      setDraft(newDraft);
+      setIsProcessingPDF(false);
+
+      // Transition to Stage 1 (Shop & Select) and open pane
+      setCurrentStep(1);
+      setIsPaneVisible(true);
+
+      // Show final chat message (Stage 1 non-catalog)
+      addChatMessage(
+        "assistant",
+        `I've added ${extractedData.quantity} vests from ${extractedData.supplierName} at ${extractedData.currency}${extractedData.unitPrice} each. Want to adjust quantity or price before we continue?`
+      );
+    }, 4000);
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('File input changed', e.target.files);
+    const file = e.target.files?.[0];
+    if (file) {
+      console.log('File selected:', file.name, file.type);
+      handleFileSelect(file);
+    }
+    // Reset input value to allow re-uploading same file
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('Drag enter', e.dataTransfer.types);
+    // Check if dragging files
+    if (e.dataTransfer.types && e.dataTransfer.types.includes('Files')) {
+      console.log('Setting drag over to true');
+      setIsDragOver(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('Drag leave');
+    // Use relatedTarget to check if we've actually left the drop zone
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+
+    if (x <= rect.left || x >= rect.right || y <= rect.top || y >= rect.bottom) {
+      console.log('Setting drag over to false');
+      setIsDragOver(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Set dropEffect to copy
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('Drop event', e.dataTransfer.files);
+    setIsDragOver(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      console.log('File dropped:', file.name, file.type);
+      if (file.type === "application/pdf" || file.name.endsWith('.pdf')) {
+        handleFileSelect(file);
+      } else {
+        addChatMessage("assistant", "Please upload a PDF file.");
+      }
+    } else {
+      console.log('No file in drop event');
+    }
+  };
+
   // Check if there are any user messages (to determine if we should show hero landing)
   const hasUserMessages = chatMessages.some(msg => msg.role === "user");
 
@@ -1443,9 +1769,10 @@ export function RequesterModuleV2() {
       {!hasUserMessages && view === "workflow" ? (
         <RequesterHeroLanding
           onSubmit={processChatMessage}
-          disabled={isSearching}
+          disabled={isSearching || isProcessingPDF}
           onMyRequests={handleShowMyRequests}
           prsCount={prs.length}
+          onFileSelect={handleFileSelect}
         />
       ) : (
         <div className="flex-1 flex overflow-hidden bg-muted/20">
@@ -1468,11 +1795,16 @@ export function RequesterModuleV2() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant={isSearching ? "default" : "secondary"} className="text-xs">
+                  <Badge variant={(isSearching || isProcessingPDF) ? "default" : "secondary"} className="text-xs">
                     {isSearching ? (
                       <>
                         <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                         Searching
+                      </>
+                    ) : isProcessingPDF ? (
+                      <>
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        Processing PDF
                       </>
                     ) : (
                       <>
@@ -1510,8 +1842,8 @@ export function RequesterModuleV2() {
                   <ChatMessageComponent key={msg.id} message={msg} />
                 ))}
 
-                {/* Show typing indicator during search */}
-                {isSearching && (
+                {/* Show typing indicator during search or PDF processing */}
+                {(isSearching || isProcessingPDF) && (
                   <div className="flex items-start gap-3">
                     <div className="flex-1 max-w-[80%]">
                       <div className="bg-muted rounded-2xl p-4">
@@ -1521,7 +1853,9 @@ export function RequesterModuleV2() {
                             <Skeleton className="h-2 w-2 rounded-full animate-pulse [animation-delay:0.2s]" />
                             <Skeleton className="h-2 w-2 rounded-full animate-pulse [animation-delay:0.4s]" />
                           </div>
-                          <span className="text-xs text-muted-foreground">Thinking...</span>
+                          <span className="text-xs text-muted-foreground">
+                            {isProcessingPDF ? "Processing..." : "Thinking..."}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -1532,38 +1866,73 @@ export function RequesterModuleV2() {
             </ScrollArea>
 
             {/* Chat Input */}
-            <CardContent className="border-t p-4">
+            <CardContent
+              className="border-t p-4"
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+            >
               <form onSubmit={handleChatSubmit} className="flex items-end gap-2">
+                {/* Hidden file input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf"
+                  onChange={handleFileInputChange}
+                  className="hidden"
+                />
+
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button type="button" variant="ghost" size="icon" className="h-10 w-10 shrink-0">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-10 w-10 shrink-0"
+                      onClick={() => {
+                        console.log('Paperclip clicked, opening file picker');
+                        fileInputRef.current?.click();
+                      }}
+                      disabled={isSearching || isProcessingPDF}
+                    >
                       <Paperclip className="h-5 w-5" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Attach file</TooltipContent>
+                  <TooltipContent>Upload quote PDF</TooltipContent>
                 </Tooltip>
 
-                <Textarea
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleChatSubmit(e as any);
-                    }
-                  }}
-                  placeholder="Type your message... (e.g., '15 laptops for new contractors')"
-                  disabled={isSearching}
-                  className="min-h-[60px] max-h-[200px] resize-none"
-                  rows={2}
-                />
+                <div className="relative flex-1">
+                  <Textarea
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleChatSubmit(e as any);
+                      }
+                    }}
+                    placeholder={isDragOver ? "Drop quote PDF to create request" : "Type your message... (e.g., '15 laptops for new contractors')"}
+                    disabled={isSearching || isProcessingPDF}
+                    className={cn(
+                      "min-h-[60px] max-h-[200px] resize-none transition-colors",
+                      isDragOver && "border-primary border-2 bg-primary/5"
+                    )}
+                    rows={2}
+                  />
+                  {isDragOver && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-primary/10 rounded-md border-2 border-dashed border-primary z-10">
+                      <p className="text-sm font-medium text-primary">Drop quote PDF to create request</p>
+                    </div>
+                  )}
+                </div>
 
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       type="submit"
                       size="icon"
-                      disabled={isSearching || !chatInput.trim()}
+                      disabled={isSearching || isProcessingPDF || !chatInput.trim()}
                       className="h-10 w-10 shrink-0"
                     >
                       <Send className="h-5 w-5" />
@@ -1668,6 +2037,7 @@ export function RequesterModuleV2() {
                 freeTextDraft={freeTextDraft}
                 onUpdateFreeTextDraft={setFreeTextDraft}
                 inferredQuantity={draft.inferredQuantity}
+                draft={draft}
               />
             )}
 

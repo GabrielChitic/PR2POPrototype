@@ -10,17 +10,23 @@ An AI-powered procurement workflow system with intelligent chat interface, built
 
 **If you're an AI assistant, read this first:**
 
-1. **Full Context Location:** [DEVELOPMENT_LOG.md](./DEVELOPMENT_LOG.md) - Read the "FOR AI ASSISTANTS" section
-2. **Current State:** v1.2 - Module 1 complete with golden catalog demo, all workflow stages, deployed on Vercel
-3. **Entry Point:** `src/modules/Requester/RequesterModuleV2.tsx` - Main workflow orchestrator
-4. **Key Concept:** 5-phase workflow (Phase 0 background + Phases 1-5) with smart chat that parses natural language and auto-fills forms
+1. **Quick Reference:** [AI_QUICK_REFERENCE.md](./AI_QUICK_REFERENCE.md) - **START HERE!** Fast context load (~10 min)
+2. **R1 Documentation:** [DEVELOPMENT_LOG.md](./DEVELOPMENT_LOG.md) - Journey R1 (Catalog) implementation history
+3. **R2 Documentation:** [R2_JOURNEY_DOCUMENTATION.md](./R2_JOURNEY_DOCUMENTATION.md) - Journey R2 (Non-Catalog) complete docs
+4. **Current State:** v2.0 - Module 1 + Journey R2 complete with both Catalog (R1) and Non-Catalog (R2) workflows
+5. **Entry Point:** `src/modules/Requester/RequesterModuleV2.tsx` - Main workflow orchestrator
+6. **Key Concepts:**
+   - **Journey R1 (Catalog):** 5-phase workflow with smart catalog search
+   - **Journey R2 (Non-Catalog):** 5-phase workflow for quote/PDF-based procurement with buyer action step
+   - **Journey Separation:** Both journeys fully isolated, conditionally rendered based on `draft.journeyType`
 
 **Quick Context Prompt for Continuing Work:**
 ```
-"I'm continuing the PR2PO Prototype. I've read DEVELOPMENT_LOG.md.
-Current state: v1.2 with Module 1 features - golden catalog demo, natural language parsing,
-chat shortcuts, and complete workflow stages 1-5.
-Key files: RequesterModuleV2.tsx (orchestrator), Step2Container.tsx (dynamic forms).
+"I'm continuing the PR2PO Prototype. I've read AI_QUICK_REFERENCE.md.
+Current state: v2.0 with both Journey R1 (Catalog) and Journey R2 (Non-Catalog) complete.
+R1: Golden catalog demo, natural language parsing, chat shortcuts.
+R2: Quote extraction, buyer action step, Denmark data, EUR support.
+Key files: RequesterModuleV2.tsx (orchestrator), Step2Container.tsx (R1 + R2 variants).
 Build status: Passing. Let's work on [describe your task]."
 ```
 
@@ -70,7 +76,7 @@ npm run build
 
 ## ✨ Features
 
-### Module 1: Golden Catalog Demo Pack
+### Journey R1: Golden Catalog Demo Pack
 - **Enhanced Catalog** - 5 laptops with full compliance metadata, SKUs, supplier IDs
 - **Natural Language Date Parsing** - "in a week", "by April", "next Friday" auto-converts to dates
 - **Location Extraction** - "Bucharest", "New York", "Munich" auto-fills location fields
@@ -78,6 +84,16 @@ npm run build
 - **Killer Demo Moments** - Proactive suggestions after search results
 - **No Double-Entry** - Quantity, location, date extracted from initial message and prefilled
 - **Blocked Item Demo** - Lenovo ThinkPad blocked for contractors (compliance demo)
+
+### Journey R2: Non-Catalog / PDF-First Workflow (NEW!)
+- **Quote Extraction** - Upload quote PDFs and extract line item details (demo stub with hardcoded data)
+- **Denmark-Specific Master Data** - 6 cost centers, 5 GL accounts, 3 commodity groups for Aarhus/Copenhagen
+- **Buyer Action Step** - Dedicated procurement review step after submission (validates quote, supplier, coding)
+- **R2-Specific Policy Checks** - 7 checks including supplier active, currency allowed, quote validity
+- **Site Selection** - Dropdown with 3 Aarhus/Copenhagen sites for delivery
+- **Complete Separation** - Journey R2 fully isolated from R1 (no breaking changes to catalog flow)
+- **Currency Support** - EUR display throughout (vs. USD for R1)
+- **Enhanced Tracking** - SLA field, buyer action timeline, supplier info in My Requests
 
 ### Smart Chat Interface
 - **Natural Language Parsing** - "15 laptops for new contractors in Bucharest by April" extracts all metadata
@@ -131,12 +147,14 @@ src/
 ## 📖 Documentation
 
 For complete development history, architecture details, and continuation instructions, see:
-- **[DEVELOPMENT_LOG.md](./DEVELOPMENT_LOG.md)** - Comprehensive development documentation with full conversation history
-- **Module 1 Features** - Detailed in Development Log Phase 11
+- **[DEVELOPMENT_LOG.md](./DEVELOPMENT_LOG.md)** - Comprehensive development documentation for Journey R1 (Catalog)
+- **[R2_JOURNEY_DOCUMENTATION.md](./R2_JOURNEY_DOCUMENTATION.md)** - **NEW!** Complete documentation for Journey R2 (Non-Catalog / PDF-First)
+- **[DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md)** - UI component guidelines and shadcn/ui usage
+- **[STYLE_GUIDE.md](./STYLE_GUIDE.md)** - Code style conventions and best practices
 
 ## 🎯 Example Workflows
 
-### Golden Demo: Catalog Goods with Chat Shortcuts
+### Journey R1: Golden Demo - Catalog Goods with Chat Shortcuts
 ```
 1. Chat: "I need 15 laptops for new contractors in Bucharest in a week"
 2. System:
@@ -175,6 +193,35 @@ For complete development history, architecture details, and continuation instruc
 6. Review & Submit
 ```
 
+### Journey R2: Non-Catalog from Quote (SuperSafe Demo)
+```
+1. Chat: "I need 50 warning vests for Aarhus site"
+2. Stage 1: Quote extraction shows:
+   - Item: Warning vest YELLOW w/reflex C470 S/M
+   - Supplier: Manufacturing A/S
+   - Qty: 50, Unit Price: EUR 35.00, Total: EUR 1,750.00
+   - Quote: Q-2026-0113
+   - Compact strip (no duplication)
+3. Stage 2: Delivery & Details (3 cards)
+   - Card A: Select AAR-DC-01 site, need-by date, instructions
+   - Card B: Recipient prefilled (Ana Popescu)
+   - Card C: Business reason (required)
+4. Stage 3: Accounting & Policy Checks
+   - Prefilled: SAFETY-PPE, GL 615200, CC-DK-AAR-MAINT
+   - 7 policy checks (all pass)
+   - Entity: UIPATH-RO
+5. Stage 4: Review & Submit
+   - Readiness verdict at top
+   - Delivery & Recipient section FIRST (with business reason)
+   - Line Items, Accounting, Evidence sections
+   - All auto-expanded
+6. Stage 5: Track & Approvals
+   - PR-9xxx created
+   - Timeline: Submitted → Buyer action (In progress) → Manager approval → ...
+   - SLA: "On track"
+7. My Requests: "Warning vests — Aarhus" • EUR 1,750 • Buyer action
+```
+
 ## 🛠️ Tech Stack
 
 - **Frontend:** React 18 + TypeScript
@@ -207,17 +254,24 @@ npm run lint     # Run ESLint (if configured)
 ### Key Context to Share with Claude:
 ```
 "I'm continuing the PR2PO Prototype project.
-Current state: v1.2 - Module 1 complete with golden catalog demo
-Last completed: [reference DEVELOPMENT_LOG.md Phase 11-12]
+Current state: v2.0 - Journey R1 (Catalog) + Journey R2 (Non-Catalog) complete
+Documentation: AI_QUICK_REFERENCE.md, DEVELOPMENT_LOG.md, R2_JOURNEY_DOCUMENTATION.md
+Last completed: Journey R2 implementation (Jan 14, 2026)
 Next task: [what you want to implement]"
 ```
 
 ### Important Files:
-- `DEVELOPMENT_LOG.md` - **READ THIS FIRST** - Full implementation history with Module 1 details
-- `src/types/workflow.ts` - Core type definitions
-- `src/modules/Requester/RequesterModuleV2.tsx` - Main orchestrator (1000+ lines)
-- `src/components/workflow/Step2Container.tsx` - Dynamic Phase 2 (1000+ lines)
-- `src/data/catalogData.ts` - Golden catalog with 5 laptops
+- `DEVELOPMENT_LOG.md` - **READ THIS FIRST** - Full implementation history with Module 1 details (R1)
+- `R2_JOURNEY_DOCUMENTATION.md` - **NEW!** - Complete R2 (Non-Catalog) journey documentation
+- `src/types/workflow.ts` - Core type definitions (includes R2 types: JourneyType, QuoteDetails)
+- `src/modules/Requester/RequesterModuleV2.tsx` - Main orchestrator (1400+ lines, includes R2 lifecycle)
+- `src/components/workflow/Step1ChooseItems.tsx` - Stage 1 with R2 quote extraction
+- `src/components/workflow/Step2Container.tsx` - Dynamic Phase 2 (1200+ lines, includes R2 variant)
+- `src/components/workflow/Step3AccountingChecks.tsx` - Stage 3 with R2 accounting (includes DK data)
+- `src/components/workflow/Step4ReviewSubmit.tsx` - Stage 4 review (includes R2 accordion layout)
+- `src/components/workflow/Step5TrackApprovals.tsx` - Stage 5 tracking (includes R2 buyer action)
+- `src/data/catalogData.ts` - Golden catalog with 5 laptops (R1)
+- `src/data/accountingData.ts` - Accounting master data (includes Denmark data for R2)
 - `src/services/unifiedSearch.ts` - Natural language parsing logic
 
 ## 🚢 Deployment
@@ -342,27 +396,41 @@ See [DEVELOPMENT_LOG.md](./DEVELOPMENT_LOG.md) Phase 12 for complete fix history
 
 ## 📊 Project Status
 
-**Current Version:** v1.2 - Module 1 complete with golden catalog demo and all workflow phases
+**Current Version:** v2.0 - Journey R1 (Catalog) + Journey R2 (Non-Catalog) complete
 **Build Status:** ✅ Passing (TypeScript + Vite)
-**Last Updated:** 2025-01-11
+**Last Updated:** 2026-01-14
 **Recent Features:**
-- Golden catalog demo pack with 5 laptops
-- Natural language date/location parsing
-- Chat shortcuts (cheapest, fastest, best offer)
-- Complete workflow Phases 3-5
-- My Requests tab in Phase 5
-- Vercel deployment fixes (type annotations, path aliases, case sensitivity)
+- **Journey R2 Complete** - Non-catalog workflow with quote extraction, buyer action step (NEW!)
+- Denmark-specific master data (6 cost centers, 5 GL accounts, 3 commodity groups) (NEW!)
+- Complete journey separation (R1 and R2 fully isolated) (NEW!)
+- Golden catalog demo pack with 5 laptops (R1)
+- Natural language date/location parsing (R1)
+- Chat shortcuts (cheapest, fastest, best offer) (R1)
+- Complete workflow Phases 1-5 (both journeys)
+- My Requests tab in Phase 5 (both journeys)
+- Vercel deployment ready
 
 ## 🗺️ Next Steps (Potential)
 
-See [DEVELOPMENT_LOG.md](./DEVELOPMENT_LOG.md) for detailed future work suggestions:
+See [DEVELOPMENT_LOG.md](./DEVELOPMENT_LOG.md) and [R2_JOURNEY_DOCUMENTATION.md](./R2_JOURNEY_DOCUMENTATION.md) for detailed future work suggestions:
+
+**Journey R1 (Catalog):**
 - Module 2: Pane visibility and Phase 0 background processing
+- Advanced catalog search (filters, facets, semantic search)
+- Mobile responsive improvements
+
+**Journey R2 (Non-Catalog):**
+- Real quote extraction (OCR/AI integration)
+- Advanced buyer action workflow (queue management, SLA tracking)
+- Multi-quote comparison
+- Supplier onboarding automation
+- Real-time contract validity checks
+
+**Shared:**
 - Backend API integration
 - Real CLM connection
 - Authentication & authorization
-- Advanced search (Elasticsearch, semantic search)
-- Mobile responsive improvements
-- Analytics & reporting dashboard
+- Analytics & reporting dashboard (R1 vs R2 adoption, cycle times)
 
 ## 📄 License
 

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Minus, Package, Filter, ArrowUpDown, Calendar, AlertCircle, CheckCircle, AlertTriangle, XCircle, FileCheck, Info } from "lucide-react";
+import { Plus, Minus, Package, Filter, ArrowUpDown, Calendar, AlertCircle, CheckCircle, AlertTriangle, XCircle, FileCheck, Info, ChevronDown, ChevronUp, FileText } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -12,7 +12,8 @@ import { StatusPill } from "../ui/StatusPill";
 import { Separator } from "../ui/separator";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
-import type { CatalogItem, DraftLineItem, FreeTextItemDraft } from "../../types/workflow";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../ui/collapsible";
+import type { CatalogItem, DraftLineItem, FreeTextItemDraft, DraftPR } from "../../types/workflow";
 
 interface Step1Props {
   catalogResults: CatalogItem[];
@@ -25,6 +26,7 @@ interface Step1Props {
   freeTextDraft?: Partial<FreeTextItemDraft> | null;
   onUpdateFreeTextDraft?: (draft: Partial<FreeTextItemDraft>) => void;
   inferredQuantity?: number; // Quantity from chat (e.g., "15 laptops")
+  draft?: DraftPR; // Full draft for NON_CATALOG detection
 }
 
 export function Step1ChooseItems({
@@ -38,13 +40,24 @@ export function Step1ChooseItems({
   freeTextDraft,
   onUpdateFreeTextDraft: _onUpdateFreeTextDraft,
   inferredQuantity,
+  draft,
 }: Step1Props) {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [filterPreferred, setFilterPreferred] = useState(false);
   const [sortBy, setSortBy] = useState<"price-asc" | "price-desc" | "leadtime">("price-asc");
 
+  // NON_CATALOG journey state
+  const [isQuoteDetailsOpen, setIsQuoteDetailsOpen] = useState(false);
+  const [editedQty, setEditedQty] = useState<number | null>(null);
+  const [editedPrice, setEditedPrice] = useState<number | null>(null);
+
   // Default quantity to use for all items (from chat or 1)
   const defaultQuantity = inferredQuantity || 1;
+
+  // Detect NON_CATALOG journey
+  const isNonCatalog = draft?.journeyType === "NON_CATALOG";
+  const quoteDetails = draft?.quoteDetails;
+  const quoteLine = selectedItems[0]; // For NON_CATALOG, there's always exactly one line
 
   // Free text form state
   const [freeTextForm, setFreeTextForm] = useState<Partial<FreeTextItemDraft>>(
@@ -122,12 +135,301 @@ export function Step1ChooseItems({
     onAddItem(mockItem, 1);
   };
 
+  // Handlers for NON_CATALOG line item editing
+  const handleQtyChange = (newQty: number) => {
+    if (quoteLine && newQty >= 1) {
+      setEditedQty(newQty);
+      onUpdateQuantity(quoteLine.id, newQty);
+    }
+  };
+
+  const handlePriceChange = (newPrice: number) => {
+    if (quoteLine && newPrice > 0) {
+      setEditedPrice(newPrice);
+      // Update the line item price through the parent
+      // This will be handled by creating a new line item with updated price
+      const updatedLine: CatalogItem = {
+        id: quoteLine.id,
+        name: quoteLine.name,
+        description: quoteLine.description,
+        category: quoteLine.category || "General",
+        unitPrice: newPrice,
+        currency: quoteLine.currency || "EUR",
+        unitOfMeasure: quoteLine.unitOfMeasure,
+        supplier: quoteLine.supplier,
+        supplierName: quoteLine.supplier,
+        isPreferredSupplier: false,
+        keywords: [],
+        compliance: {
+          preferred: false,
+          contractStatus: "missing",
+          allowed: true,
+        },
+      };
+      onRemoveItem(quoteLine.id);
+      onAddItem(updatedLine, editedQty || quoteLine.quantity);
+    }
+  };
+
+  // Validation for NON_CATALOG
+  const currentQty = editedQty ?? quoteLine?.quantity ?? 0;
+  const currentPrice = editedPrice ?? quoteLine?.unitPrice ?? 0;
+  const currentTotal = currentQty * currentPrice;
+  const hasValidQty = currentQty >= 1;
+  const hasValidPrice = currentPrice > 0;
+  const hasSupplier = quoteLine?.supplier && quoteLine.supplier.length > 0;
+  const hasDescription = quoteLine?.description && quoteLine.description.length > 0;
+  const canProceed = hasValidQty && hasValidPrice && hasSupplier && hasDescription;
+
   return (
     <TooltipProvider>
       <div className="flex-1 overflow-y-auto p-8 bg-muted/30">
         <div className="max-w-6xl mx-auto space-y-6">
+
+        {/* NON_CATALOG Journey (PDF-first) */}
+        {isNonCatalog && quoteLine && quoteDetails ? (
+          <>
+            {/* Header */}
+            <div>
+              <h2 className="text-2xl font-semibold tracking-tight mb-2">Non-catalog item from quote</h2>
+              <p className="text-sm text-muted-foreground">
+                We pre-filled this from your uploaded quote. Confirm the basics before continuing.
+              </p>
+            </div>
+
+            {/* Quote Evidence Card (Collapsible) */}
+            <Card>
+              <Collapsible open={isQuoteDetailsOpen} onOpenChange={setIsQuoteDetailsOpen}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-muted-foreground" />
+                      <CardTitle className="text-base">Quote Details</CardTitle>
+                    </div>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        {isQuoteDetailsOpen ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </CollapsibleTrigger>
+                  </div>
+                </CardHeader>
+                <CollapsibleContent>
+                  <CardContent className="pt-0 space-y-3">
+                    <Separator />
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Supplier:</span>
+                        <p className="font-medium">{quoteDetails.supplierName}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Quote #:</span>
+                        <p className="font-medium">{quoteDetails.quoteNumber}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Quote date:</span>
+                        <p className="font-medium">{quoteDetails.quoteDate}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Currency:</span>
+                        <p className="font-medium">{quoteDetails.currency}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Validity:</span>
+                        <p className="font-medium">{quoteDetails.validity}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Payment terms:</span>
+                        <p className="font-medium">{quoteDetails.paymentTerms}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Lead time:</span>
+                        <p className="font-medium">{quoteDetails.leadTime}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Delivery terms:</span>
+                        <p className="font-medium">{quoteDetails.deliveryTerms}</p>
+                      </div>
+                    </div>
+                    <Separator />
+                    <Button variant="outline" size="sm" className="w-full">
+                      <FileText className="h-4 w-4 mr-2" />
+                      View attachment
+                    </Button>
+                  </CardContent>
+                </CollapsibleContent>
+              </Collapsible>
+            </Card>
+
+            {/* Line Item Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Package className="h-5 w-5 text-muted-foreground" />
+                  Line Item
+                  <Badge variant="secondary" className="ml-auto text-xs">From quote</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Item Name */}
+                <div>
+                  <Label className="text-sm text-muted-foreground">Item name</Label>
+                  <p className="text-base font-medium mt-1">{quoteLine.name}</p>
+                </div>
+
+                <Separator />
+
+                {/* Supplier */}
+                <div>
+                  <Label className="text-sm text-muted-foreground">Supplier</Label>
+                  <p className="text-base font-medium mt-1">{quoteLine.supplier}</p>
+                </div>
+
+                <Separator />
+
+                {/* Quantity (Editable) */}
+                <div className="space-y-2">
+                  <Label htmlFor="qty-input">Quantity</Label>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleQtyChange(currentQty - 1)}
+                      disabled={currentQty <= 1}
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <Input
+                      id="qty-input"
+                      type="number"
+                      value={currentQty}
+                      onChange={(e) => handleQtyChange(parseInt(e.target.value) || 1)}
+                      className="w-24 text-center"
+                      min={1}
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleQtyChange(currentQty + 1)}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm text-muted-foreground">{quoteLine.unitOfMeasure}</span>
+                  </div>
+                  {!hasValidQty && (
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>Quantity must be at least 1.</AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+
+                <Separator />
+
+                {/* Unit Price (Editable) */}
+                <div className="space-y-2">
+                  <Label htmlFor="price-input">Unit price</Label>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-muted-foreground">{quoteLine.currency || "EUR"}</span>
+                    <Input
+                      id="price-input"
+                      type="number"
+                      value={currentPrice.toFixed(2)}
+                      onChange={(e) => handlePriceChange(parseFloat(e.target.value) || 0)}
+                      className="w-32"
+                      min={0}
+                      step={0.01}
+                    />
+                  </div>
+                  {!hasValidPrice && (
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>Price must be greater than 0.</AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+
+                <Separator />
+
+                {/* Total (Calculated) */}
+                <div className="bg-muted/50 p-4 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-base font-medium">Total</span>
+                    <span className="text-xl font-bold">
+                      {quoteLine.currency || "EUR"} {currentTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Compact Request Summary Strip */}
+            <div className="bg-muted/30 border border-border/50 rounded-lg px-4 py-3">
+              <div className="flex items-center justify-between gap-6">
+                {/* Left: Label + Badge */}
+                <div className="flex items-center gap-2">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Extracted from quote</p>
+                    <p className="text-xs text-muted-foreground/70 mt-0.5">1 line item</p>
+                  </div>
+                  <Badge variant="secondary" className="text-xs">From quote</Badge>
+                </div>
+
+                {/* Middle: Quote + Supplier */}
+                <div className="flex items-center gap-6 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Quote:</span>{" "}
+                    <span className="font-medium">{quoteDetails?.quoteNumber || "N/A"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Supplier:</span>{" "}
+                    <span className="font-medium">{quoteLine.supplier}</span>
+                  </div>
+                </div>
+
+                {/* Right: Total (Emphasized) */}
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground mb-0.5">Total</p>
+                  <p className="text-xl font-bold text-foreground">
+                    {quoteLine.currency || "EUR"} {currentTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Navigation */}
+            <div className="flex items-center justify-between pt-4">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" disabled>
+                    Back
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Quote already processed</TooltipContent>
+              </Tooltip>
+
+              <div className="flex items-center gap-3">
+                {!canProceed && (
+                  <p className="text-sm text-destructive">
+                    {!hasValidQty ? "Invalid quantity" :
+                     !hasValidPrice ? "Invalid price" :
+                     !hasSupplier ? "Supplier missing" :
+                     !hasDescription ? "Description missing" : ""}
+                  </p>
+                )}
+                <Button onClick={onNext} disabled={!canProceed} size="lg">
+                  Next: Delivery & Details
+                </Button>
+              </div>
+            </div>
+          </>
+        ) : null}
+
         {/* Catalog Grid (1A) */}
-        {!showFreeTextForm && catalogResults.length > 0 && (
+        {!isNonCatalog && !showFreeTextForm && catalogResults.length > 0 && (
           <>
             <div>
               <h2 className="text-2xl font-semibold tracking-tight mb-2">Choose items from catalog</h2>
@@ -506,8 +808,8 @@ export function Step1ChooseItems({
           </div>
         )}
 
-        {/* Selected Items Basket */}
-        {selectedItems.length > 0 && (
+        {/* Selected Items Basket - Only for CATALOG journey */}
+        {!isNonCatalog && selectedItems.length > 0 && (
           <div className="border-t border-gray-200 pt-6 space-y-4">
             <h3 className="text-base font-semibold text-gray-900">My Request ({selectedItems.length})</h3>
             <div className="space-y-3">

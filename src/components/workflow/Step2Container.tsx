@@ -1,8 +1,12 @@
 import { useState, useEffect } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { Card, CardContent } from "../ui/card";
-import { ShoppingCart, FileText, Briefcase, Upload, AlertCircle, X, Check, FileIcon, Calendar } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import { ShoppingCart, FileText, Briefcase, Upload, AlertCircle, X, Check, FileIcon, Calendar, Package, MapPin } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { Checkbox } from "../ui/checkbox";
+import { Label } from "../ui/label";
+import { Badge } from "../ui/badge";
 import type { DraftPR, PurchaseInfo, RequestType, CLMContract, UploadedFile } from "../../types/workflow";
 
 interface Step2Props {
@@ -84,6 +88,42 @@ export function Step2Container({ draft, onUpdate, onNext, onBack, onUpdateDraft 
     draft.uploadedFiles || []
   );
 
+  // R2 NON_CATALOG constants
+  const isNonCatalog = draft.journeyType === "NON_CATALOG";
+  const defaultContactName = "Ana Popescu";
+  const defaultContactEmail = "ana.popescu@company.com";
+  const defaultContactPhone = "+40 712 345 678";
+
+  const demoSites = [
+    {
+      id: "AAR-DC-01",
+      name: "AAR-DC-01 — Aarhus Distribution Center",
+      address: "Logistikvej 12, 8200 Aarhus N, Denmark",
+    },
+    {
+      id: "AAR-PL-02",
+      name: "AAR-PL-02 — Aarhus Plant (Receiving Dock)",
+      address: "Industriparken 8, 8260 Viby J, Denmark",
+    },
+    {
+      id: "CPH-HQ-01",
+      name: "CPH-HQ-01 — Copenhagen HQ",
+      address: "Hovedgade 1, 1050 København, Denmark",
+    },
+  ];
+
+  // Form validation
+  const purchaseInfo = draft.purchaseInfo || {
+    usage: "",
+    isPartOfProject: false,
+    deliverTo: "",
+    deliverToLocation: "",
+    needByDate: "",
+    involvesPersonalData: false,
+    involvesThirdParty: false,
+    requiresSpecialApproval: false,
+  };
+
   // Load CLM contracts on mount (simulate CLM API call)
   useEffect(() => {
     if (draft.requestType === "servicesOrComplex" && draft.lineItems.length > 0) {
@@ -91,6 +131,42 @@ export function Step2Container({ draft, onUpdate, onNext, onBack, onUpdateDraft 
       setCLMContracts(contracts);
     }
   }, [draft.requestType, draft.lineItems]);
+
+  // Initialize R2 defaults on mount
+  useEffect(() => {
+    if (isNonCatalog) {
+      const updates: Partial<PurchaseInfo> = {};
+      let needsUpdate = false;
+
+      // Set default site to Aarhus if not already set
+      if (!purchaseInfo.shipToSiteId) {
+        const defaultSite = demoSites[0]; // AAR-DC-01
+        updates.shipToSiteId = defaultSite.id;
+        updates.shipToAddress = defaultSite.address;
+        updates.deliverToLocation = defaultSite.address;
+        needsUpdate = true;
+      }
+
+      // Set default contact to Ana Popescu if not already set
+      if (!purchaseInfo.deliveryContactName) {
+        updates.deliveryContactName = defaultContactName;
+        updates.deliveryContactEmail = defaultContactEmail;
+        updates.deliveryContactPhone = defaultContactPhone;
+        updates.deliveryContactIsSelf = true;
+        needsUpdate = true;
+      }
+
+      // Set default business reason if not already set
+      if (!purchaseInfo.usage) {
+        updates.usage = "PPE replenishment for on-site maintenance team (Aarhus).";
+        needsUpdate = true;
+      }
+
+      if (needsUpdate) {
+        onUpdate(updates);
+      }
+    }
+  }, [isNonCatalog]);
 
   // Handle contract selection
   const handleSelectContract = (contract: CLMContract) => {
@@ -149,18 +225,6 @@ export function Step2Container({ draft, onUpdate, onNext, onBack, onUpdateDraft 
   // For free text and services, use threshold
   const requiresAttachment = requestType !== "catalogGoods" && totalValue >= ATTACHMENT_THRESHOLD;
 
-  // Form validation
-  const purchaseInfo = draft.purchaseInfo || {
-    usage: "",
-    isPartOfProject: false,
-    deliverTo: "",
-    deliverToLocation: "",
-    needByDate: "",
-    involvesPersonalData: false,
-    involvesThirdParty: false,
-    requiresSpecialApproval: false,
-  };
-
   const isValid2A =
     purchaseInfo.usage?.trim().length > 0 &&
     purchaseInfo.deliverTo?.trim().length > 0 &&
@@ -179,11 +243,313 @@ export function Step2Container({ draft, onUpdate, onNext, onBack, onUpdateDraft 
     purchaseInfo.deliverTo?.trim().length > 0 &&
     purchaseInfo.deliverToLocation?.trim().length > 0;
 
+  // R2 NON_CATALOG specific state
+  const [deliveryContactIsSelf, setDeliveryContactIsSelf] = useState(
+    purchaseInfo.deliveryContactIsSelf !== false
+  );
+
+  // R2 validation
+  const isValidR2 =
+    purchaseInfo.shipToSiteId &&
+    purchaseInfo.needByDate &&
+    purchaseInfo.usage?.trim().length > 0 &&
+    (deliveryContactIsSelf ||
+      (purchaseInfo.deliveryContactName && purchaseInfo.deliveryContactEmail));
+
   return (
     <div className="flex-1 overflow-y-auto p-8 bg-muted/30">
       <div className="max-w-3xl mx-auto space-y-6">
+        {/* R2: NON_CATALOG (PDF-first "SuperSafe") */}
+        {isNonCatalog && (
+          <>
+            {/* Header with SuperSafe label */}
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-semibold tracking-tight text-foreground">
+                  Delivery & Details
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Confirm where and when you need this delivered
+                </p>
+              </div>
+              <Badge variant="outline" className="text-xs">
+                SuperSafe (Quote-based request)
+              </Badge>
+            </div>
+
+            {/* Card A: Delivery */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <MapPin className="h-5 w-5 text-muted-foreground" />
+                  Delivery
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Deliver to (site/address) */}
+                <div className="space-y-2">
+                  <Label htmlFor="ship-to-site">
+                    Deliver to (site / address) <span className="text-destructive">*</span>
+                  </Label>
+                  <Select
+                    value={purchaseInfo.shipToSiteId || "AAR-DC-01"}
+                    onValueChange={(value) => {
+                      const selectedSite = demoSites.find((s) => s.id === value);
+                      onUpdate({
+                        shipToSiteId: value,
+                        shipToAddress: selectedSite?.address,
+                        deliverToLocation: selectedSite?.address,
+                      });
+                    }}
+                  >
+                    <SelectTrigger id="ship-to-site">
+                      <SelectValue placeholder="Select delivery site" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {demoSites.map((site) => (
+                        <SelectItem key={site.id} value={site.id}>
+                          {site.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {purchaseInfo.shipToAddress && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {purchaseInfo.shipToAddress}
+                    </p>
+                  )}
+                </div>
+
+                {/* Need-by date */}
+                <div className="space-y-2">
+                  <Label htmlFor="need-by-date">
+                    Need by date <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="need-by-date"
+                    type="date"
+                    value={purchaseInfo.needByDate}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      onUpdate({ needByDate: e.target.value })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Quote lead time: 2 weeks. Earlier delivery may require expediting.
+                  </p>
+                </div>
+
+                {/* Delivery instructions */}
+                <div className="space-y-2">
+                  <Label htmlFor="delivery-instructions">
+                    Delivery instructions (optional)
+                  </Label>
+                  <Input
+                    id="delivery-instructions"
+                    value={purchaseInfo.deliveryInstructions || ""}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      onUpdate({ deliveryInstructions: e.target.value })
+                    }
+                    placeholder="Dock, receiving hours, gate reference, internal note…"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Card B: Recipient / Contact */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Package className="h-5 w-5 text-muted-foreground" />
+                  Recipient / Contact
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Delivery contact (prefilled) */}
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="contact-name">
+                      Delivery contact <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="contact-name"
+                      value={
+                        deliveryContactIsSelf
+                          ? defaultContactName
+                          : purchaseInfo.deliveryContactName || ""
+                      }
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        onUpdate({ deliveryContactName: e.target.value })
+                      }
+                      disabled={deliveryContactIsSelf}
+                      className={deliveryContactIsSelf ? "bg-muted" : ""}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="contact-email">
+                        Email <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="contact-email"
+                        type="email"
+                        value={
+                          deliveryContactIsSelf
+                            ? defaultContactEmail
+                            : purchaseInfo.deliveryContactEmail || ""
+                        }
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                          onUpdate({ deliveryContactEmail: e.target.value })
+                        }
+                        disabled={deliveryContactIsSelf}
+                        className={deliveryContactIsSelf ? "bg-muted" : ""}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="contact-phone">Phone (optional)</Label>
+                      <Input
+                        id="contact-phone"
+                        type="tel"
+                        value={
+                          deliveryContactIsSelf
+                            ? defaultContactPhone
+                            : purchaseInfo.deliveryContactPhone || ""
+                        }
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                          onUpdate({ deliveryContactPhone: e.target.value })
+                        }
+                        disabled={deliveryContactIsSelf}
+                        className={deliveryContactIsSelf ? "bg-muted" : ""}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Checkbox: Delivery contact is someone else */}
+                  <div className="flex items-center space-x-2 pt-2">
+                    <Checkbox
+                      id="contact-is-other"
+                      checked={!deliveryContactIsSelf}
+                      onCheckedChange={(checked) => {
+                        setDeliveryContactIsSelf(!checked);
+                        onUpdate({ deliveryContactIsSelf: !checked });
+                        if (checked) {
+                          // Clear when switching to someone else
+                          onUpdate({
+                            deliveryContactName: "",
+                            deliveryContactEmail: "",
+                            deliveryContactPhone: "",
+                          });
+                        } else {
+                          // Restore defaults when switching back to self
+                          onUpdate({
+                            deliveryContactName: defaultContactName,
+                            deliveryContactEmail: defaultContactEmail,
+                            deliveryContactPhone: defaultContactPhone,
+                          });
+                        }
+                      }}
+                    />
+                    <Label
+                      htmlFor="contact-is-other"
+                      className="text-sm font-normal cursor-pointer"
+                    >
+                      Delivery contact is someone else
+                    </Label>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Card C: Business Context */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Business Context</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Business reason */}
+                <div className="space-y-2">
+                  <Label htmlFor="business-reason">
+                    Business reason <span className="text-destructive">*</span>
+                  </Label>
+                  <textarea
+                    id="business-reason"
+                    value={purchaseInfo.usage || "PPE replenishment for on-site maintenance team (Aarhus)."}
+                    onChange={(e) => onUpdate({ usage: e.target.value })}
+                    rows={2}
+                    className="w-full border-2 border-input rounded-md px-3 py-2 text-sm text-foreground shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                    placeholder="Brief reason or justification..."
+                  />
+                </div>
+
+                {/* Part of a project or initiative */}
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="part-of-project-r2"
+                      checked={purchaseInfo.isPartOfProject}
+                      onCheckedChange={(checked) =>
+                        onUpdate({ isPartOfProject: checked as boolean })
+                      }
+                    />
+                    <Label
+                      htmlFor="part-of-project-r2"
+                      className="text-sm font-normal cursor-pointer"
+                    >
+                      Part of a project or initiative
+                    </Label>
+                  </div>
+                  {purchaseInfo.isPartOfProject && (
+                    <Select
+                      value={purchaseInfo.projectName || ""}
+                      onValueChange={(value) => onUpdate({ projectName: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select project..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Safety Compliance 2026">
+                          Safety Compliance 2026
+                        </SelectItem>
+                        <SelectItem value="Plant Maintenance Q1">
+                          Plant Maintenance Q1
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Quote on file strip */}
+            <div className="bg-muted/50 border border-border rounded-lg px-4 py-3">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <Badge variant="secondary" className="text-xs">
+                    Quote attached
+                  </Badge>
+                  <p className="text-sm text-muted-foreground">
+                    {draft.quoteDetails?.quoteNumber || "Q-2026-0113"} •{" "}
+                    {draft.lineItems[0]?.supplier || "Manufacturing A/S"} •{" "}
+                    {draft.lineItems[0]?.currency || "EUR"}{" "}
+                    {draft.lineItems
+                      .reduce((sum, item) => sum + item.totalPrice, 0)
+                      .toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                  </p>
+                </div>
+                <Button variant="outline" size="sm">
+                  <FileText className="h-4 w-4 mr-2" />
+                  View quote
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+
         {/* Variant 2A: Catalog Goods */}
-        {requestType === "catalogGoods" && (
+        {requestType === "catalogGoods" && !isNonCatalog && (
           <>
             <div className="flex items-center gap-3 mb-6">
               <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -325,7 +691,7 @@ export function Step2Container({ draft, onUpdate, onNext, onBack, onUpdateDraft 
         )}
 
         {/* Variant 2B: Free-Text Goods */}
-        {requestType === "freeTextGoods" && (
+        {requestType === "freeTextGoods" && !isNonCatalog && (
           <>
             <div className="flex items-center gap-3 mb-6">
               <div className="w-12 h-12 rounded-lg bg-amber-500/10 flex items-center justify-center">
@@ -551,7 +917,7 @@ export function Step2Container({ draft, onUpdate, onNext, onBack, onUpdateDraft 
         )}
 
         {/* Variant 2C: Services / Complex */}
-        {requestType === "servicesOrComplex" && (
+        {requestType === "servicesOrComplex" && !isNonCatalog && (
           <>
             <div className="flex items-center gap-3 mb-6">
               <div className="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center">
@@ -1066,17 +1432,18 @@ export function Step2Container({ draft, onUpdate, onNext, onBack, onUpdateDraft 
         {/* Navigation Buttons */}
         <div className="flex justify-between pt-6">
           <Button variant="outline" onClick={onBack}>
-            Back to Items
+            {isNonCatalog ? "Back to Shop & Select" : "Back to Items"}
           </Button>
           <Button
             onClick={onNext}
             disabled={
-              (requestType === "catalogGoods" && !isValid2A) ||
+              (isNonCatalog && !isValidR2) ||
+              (requestType === "catalogGoods" && !isNonCatalog && !isValid2A) ||
               (requestType === "freeTextGoods" && !isValid2B) ||
               (requestType === "servicesOrComplex" && !isValid2C)
             }
           >
-            Next: Review Summary
+            {isNonCatalog ? "Next: Accounting & Policy Checks" : "Next: Review Summary"}
           </Button>
         </div>
       </div>

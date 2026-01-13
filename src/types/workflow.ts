@@ -90,6 +90,14 @@ export interface PurchaseInfo {
   involvesPersonalData: boolean;
   involvesThirdParty: boolean;
   requiresSpecialApproval: boolean;
+  // R2 NON_CATALOG specific fields
+  shipToSiteId?: string;
+  shipToAddress?: string;
+  deliveryInstructions?: string;
+  deliveryContactName?: string;
+  deliveryContactEmail?: string;
+  deliveryContactPhone?: string;
+  deliveryContactIsSelf?: boolean;
 }
 
 export type CheckStatus = "pass" | "warn" | "block";
@@ -226,6 +234,13 @@ export interface DraftPR {
   costCenterName?: string;
   accountingValidation?: AccountingValidation;
   policyChecks?: PolicyCheckResult[];
+  // R2 account assignment
+  accountAssignmentType?: "CostCenter" | "Project";
+  wbsElement?: string;
+  internalOrder?: string;
+  // Journey type and quote details for non-catalog PDF path
+  journeyType?: JourneyType;
+  quoteDetails?: QuoteDetails;
 }
 
 // Uploaded file metadata
@@ -236,6 +251,22 @@ export interface UploadedFile {
   type: string;
   uploadedAt: Date;
 }
+
+// Quote details for non-catalog PDF journey
+export interface QuoteDetails {
+  supplierName: string;
+  quoteNumber: string;
+  quoteDate: string;
+  currency: string;
+  validity: string; // e.g., "14 days"
+  paymentTerms: string; // e.g., "Net 30"
+  leadTime: string; // e.g., "7–10 business days"
+  deliveryTerms: string; // e.g., "DAP — Aarhus, Denmark"
+  supplierLocation: string;
+}
+
+// Journey type for request
+export type JourneyType = "CATALOG" | "NON_CATALOG";
 
 // CLM Contract
 export interface CLMContract {

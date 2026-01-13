@@ -61,7 +61,7 @@ function TrackingView({
           {/* Current Status Summary */}
           <Card>
             <CardContent className="p-6">
-              <div className="grid grid-cols-3 gap-6">
+              <div className={`grid ${pr.draftPR?.journeyType === "NON_CATALOG" ? "grid-cols-4" : "grid-cols-3"} gap-6`}>
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Current step</p>
                   <p className="text-sm font-semibold text-foreground">{pr.currentStep}</p>
@@ -74,6 +74,12 @@ function TrackingView({
                   <p className="text-xs text-muted-foreground mb-1">Time in step</p>
                   <p className="text-sm font-semibold text-foreground">{pr.timeInStep}</p>
                 </div>
+                {pr.draftPR?.journeyType === "NON_CATALOG" && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">SLA</p>
+                    <p className="text-sm font-semibold text-green-600">On track</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -231,7 +237,9 @@ function TrackingView({
                 {!isDetailsOpen && (
                   <div className="pt-2">
                     <p className="text-sm text-muted-foreground">
-                      {pr.itemsSummary} • ${pr.totalValue.toLocaleString()} • {pr.deliverySummary.split(',')[0]}
+                      {pr.itemsSummary} • {pr.draftPR?.journeyType === "NON_CATALOG"
+                        ? `${pr.draftPR?.lineItems[0]?.currency || "EUR"} ${pr.totalValue.toLocaleString()}`
+                        : `$${pr.totalValue.toLocaleString()}`} • {pr.deliverySummary.split(',')[0]}
                     </p>
                   </div>
                 )}
@@ -244,10 +252,25 @@ function TrackingView({
                     <p className="text-sm font-medium">{pr.prNumber}</p>
                   </div>
                   <Separator />
+                  {pr.draftPR?.journeyType === "NON_CATALOG" && (
+                    <>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Supplier</p>
+                        <p className="text-sm font-medium">
+                          {pr.draftPR?.lineItems[0]?.supplier || "Manufacturing A/S"}
+                        </p>
+                      </div>
+                      <Separator />
+                    </>
+                  )}
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">Items</p>
                     <p className="text-sm">{pr.itemsSummary}</p>
-                    <p className="text-sm font-semibold mt-1">Total: ${pr.totalValue.toLocaleString()}</p>
+                    <p className="text-sm font-semibold mt-1">
+                      Total: {pr.draftPR?.journeyType === "NON_CATALOG"
+                        ? `${pr.draftPR?.lineItems[0]?.currency || "EUR"} ${pr.totalValue.toLocaleString()}`
+                        : `$${pr.totalValue.toLocaleString()}`}
+                    </p>
                   </div>
                   <Separator />
                   <div>
@@ -260,6 +283,23 @@ function TrackingView({
                     <p className="text-sm">{pr.accountingSummary}</p>
                   </div>
                   <Separator />
+                  {pr.draftPR?.journeyType === "NON_CATALOG" && pr.draftPR?.quoteDetails && (
+                    <>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Evidence</p>
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          <p className="text-sm">
+                            Quote — {pr.draftPR.quoteDetails.quoteNumber} (PDF)
+                          </p>
+                          <Button variant="ghost" size="sm" className="text-xs h-6 px-2">
+                            View quote
+                          </Button>
+                        </div>
+                      </div>
+                      <Separator />
+                    </>
+                  )}
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">Policy Checks</p>
                     <div className="flex flex-wrap gap-2 mt-1">
@@ -415,14 +455,21 @@ function MyRequestsList({
                           <span>{pr.currentStep}</span>
                           {pr.currentOwner && <span>• {pr.currentOwner}</span>}
                         </div>
-                        <div className="text-sm text-muted-foreground">{pr.itemsSummary}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {pr.itemsSummary}
+                          {pr.draftPR?.journeyType === "NON_CATALOG" && pr.draftPR?.lineItems[0]?.supplier && (
+                            <span className="ml-2">• Supplier: {pr.draftPR.lineItems[0].supplier}</span>
+                          )}
+                        </div>
                       </div>
                       <div className="flex flex-col items-end gap-2">
                         <Badge variant="outline" className={getStatusBadgeColor(pr.status)}>
                           {getStatusLabel(pr.status)}
                         </Badge>
                         <span className="text-sm font-semibold text-foreground">
-                          ${pr.totalValue.toLocaleString()}
+                          {pr.draftPR?.journeyType === "NON_CATALOG"
+                            ? `${pr.draftPR?.lineItems[0]?.currency || "EUR"} ${pr.totalValue.toLocaleString()}`
+                            : `$${pr.totalValue.toLocaleString()}`}
                         </span>
                         <span className="text-xs text-muted-foreground">
                           {new Date(pr.submittedAt).toLocaleDateString()}
