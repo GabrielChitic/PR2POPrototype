@@ -13,20 +13,26 @@ An AI-powered procurement workflow system with intelligent chat interface, built
 1. **Quick Reference:** [AI_QUICK_REFERENCE.md](./AI_QUICK_REFERENCE.md) - **START HERE!** Fast context load (~10 min)
 2. **R1 Documentation:** [DEVELOPMENT_LOG.md](./DEVELOPMENT_LOG.md) - Journey R1 (Catalog) implementation history
 3. **R2 Documentation:** [R2_JOURNEY_DOCUMENTATION.md](./R2_JOURNEY_DOCUMENTATION.md) - Journey R2 (Non-Catalog) complete docs
-4. **Current State:** v2.0 - Module 1 + Journey R2 complete with both Catalog (R1) and Non-Catalog (R2) workflows
-5. **Entry Point:** `src/modules/Requester/RequesterModuleV2.tsx` - Main workflow orchestrator
-6. **Key Concepts:**
+4. **Procurement Module:** See [Procurement Module section](#-procurement-module-buyerprocurement-team-view) below - PR/PO workbench docs
+5. **Current State:** v2.1 - Requester Module (R1 + R2) + Procurement Module complete
+6. **Entry Points:**
+   - **Requester:** `src/modules/Requester/RequesterModuleV2.tsx` - Workflow orchestrator
+   - **Procurement:** `src/modules/Procurement/ProcurementModule.tsx` - PR/PO workbench
+7. **Key Concepts:**
    - **Journey R1 (Catalog):** 5-phase workflow with smart catalog search
    - **Journey R2 (Non-Catalog):** 5-phase workflow for quote/PDF-based procurement with buyer action step
-   - **Journey Separation:** Both journeys fully isolated, conditionally rendered based on `draft.journeyType`
+   - **Procurement Workbench:** PR/PO management with BBraun R2 Happy Flow (operational procurement)
+   - **Journey Separation:** All workflows fully isolated and independently functional
 
 **Quick Context Prompt for Continuing Work:**
 ```
-"I'm continuing the PR2PO Prototype. I've read AI_QUICK_REFERENCE.md.
-Current state: v2.0 with both Journey R1 (Catalog) and Journey R2 (Non-Catalog) complete.
-R1: Golden catalog demo, natural language parsing, chat shortcuts.
-R2: Quote extraction, buyer action step, Denmark data, EUR support.
-Key files: RequesterModuleV2.tsx (orchestrator), Step2Container.tsx (R1 + R2 variants).
+"I'm continuing the PR2PO Prototype. I've read AI_QUICK_REFERENCE.md and README.md.
+Current state: v2.1 - Requester Module (R1 + R2) + Procurement Module complete.
+- Requester R1: Golden catalog demo, natural language parsing, chat shortcuts.
+- Requester R2: Quote extraction, buyer action step, Denmark data, EUR support.
+- Procurement: PR/PO workbench, BBraun R2 Happy Flow, validation cockpit, dispatch/EKES.
+Key files: RequesterModuleV2.tsx (requester), ProcurementModule.tsx (workbench),
+PRPOFullDetail.tsx (detail views), allProcurementData.ts (data aggregator).
 Build status: Passing. Let's work on [describe your task]."
 ```
 
@@ -134,8 +140,8 @@ src/
 │   ├── ui/              # Reusable UI components (button, input, card, etc.)
 │   └── workflow/        # Workflow phase components (Step1-5, Stepper, MyRequestsView)
 ├── modules/
-│   ├── Requester/       # Main workflow module (RequesterModuleV2)
-│   ├── Procurement/     # Procurement team view
+│   ├── Requester/       # Requester workflow (Journey R1 + R2)
+│   ├── Procurement/     # Procurement workbench (PR/PO management, BBraun demo)
 │   ├── Overview/        # Dashboard
 │   └── Settings/        # Settings
 ├── context/             # Global state management (PRContext)
@@ -148,7 +154,9 @@ src/
 
 For complete development history, architecture details, and continuation instructions, see:
 - **[DEVELOPMENT_LOG.md](./DEVELOPMENT_LOG.md)** - Comprehensive development documentation for Journey R1 (Catalog)
-- **[R2_JOURNEY_DOCUMENTATION.md](./R2_JOURNEY_DOCUMENTATION.md)** - **NEW!** Complete documentation for Journey R2 (Non-Catalog / PDF-First)
+- **[R2_JOURNEY_DOCUMENTATION.md](./R2_JOURNEY_DOCUMENTATION.md)** - Complete documentation for Journey R2 (Non-Catalog / PDF-First)
+- **[Procurement Module](#-procurement-module-buyerprocurement-team-view)** - **NEW!** PR/PO workbench, BBraun R2 Happy Flow, validation cockpit (see below)
+- **[src/data/README.md](./src/data/README.md)** - Data architecture and circular dependency prevention
 - **[DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md)** - UI component guidelines and shadcn/ui usage
 - **[STYLE_GUIDE.md](./STYLE_GUIDE.md)** - Code style conventions and best practices
 
@@ -222,6 +230,50 @@ For complete development history, architecture details, and continuation instruc
 7. My Requests: "Warning vests — Aarhus" • EUR 1,750 • Buyer action
 ```
 
+### Procurement Module: BBraun R2 Happy Flow (Operational Procurement)
+```
+1. PR Workbench: View PR-4546245893
+   - Status: Ready for PO
+   - Material: PL568T (Surgical Clips)
+   - Supplier: AESCULAP
+   - Amount: EUR 140,940.80
+   - All approvals complete (3-level workflow)
+
+2. Open PR Detail → Validation Cockpit shows:
+   ✅ 11 checks passed (cost, quantity, dates, specs, master data)
+   ✅ Commercial conditions defaulted from info record 5301133479
+   ✅ Readiness evaluation: Ready for conversion
+
+3. Click "Convert to PO" button
+   → PO-4516638113 created
+   → PR transitions to "Handoff to PO"
+   → PR header shows: "Linked PO: PO-4516638113" chip
+   → Toast: "PO Created Successfully"
+
+4. PO Workbench: View PO-4516638113
+   - Status: Ready to send
+   - Header shows: "Source PR: PR-4546245893" chip
+   - Validation cockpit: All checks pass
+   - Release/Approval Trace: 3-level approval (pre-recorded demo)
+
+5. Click "Send PO (demo)" button
+   → Dispatch to AESCULAP via EDI/IDOC
+   → EKES confirmation received (simulated 2h later)
+   → Confirmed qty: 2,288 PAK (no deviation)
+   → Confirmed delivery: 120 days (within tolerance)
+   → Status: "Confirmed · Awaiting delivery"
+
+6. Audit Trail (both PR and PO):
+   - Evidence links: Info Record 5301133479, Historical POs (18 on file), EKES Confirmation AB
+   - Full traceability: Conversion → Dispatch → Confirmation events
+   - Clickable chips for navigation between linked objects
+
+7. Demo Reset (Settings dropdown):
+   - Reset BBraun PR to "Ready for PO" state
+   - Remove created PO
+   - Ready to demo again
+```
+
 ## 🛠️ Tech Stack
 
 - **Frontend:** React 18 + TypeScript
@@ -254,15 +306,21 @@ npm run lint     # Run ESLint (if configured)
 ### Key Context to Share with Claude:
 ```
 "I'm continuing the PR2PO Prototype project.
-Current state: v2.0 - Journey R1 (Catalog) + Journey R2 (Non-Catalog) complete
-Documentation: AI_QUICK_REFERENCE.md, DEVELOPMENT_LOG.md, R2_JOURNEY_DOCUMENTATION.md
-Last completed: Journey R2 implementation (Jan 14, 2026)
+Current state: v2.1 - Requester Module (R1 + R2) + Procurement Module complete
+Documentation: README.md (Procurement specs), AI_QUICK_REFERENCE.md, DEVELOPMENT_LOG.md, R2_JOURNEY_DOCUMENTATION.md
+Last completed: Procurement Module with BBraun R2 Happy Flow (Jan 23, 2026)
+Modules: Requester (catalog/non-catalog journeys) + Procurement (PR/PO workbench)
 Next task: [what you want to implement]"
 ```
 
 ### Important Files:
-- `DEVELOPMENT_LOG.md` - **READ THIS FIRST** - Full implementation history with Module 1 details (R1)
-- `R2_JOURNEY_DOCUMENTATION.md` - **NEW!** - Complete R2 (Non-Catalog) journey documentation
+
+**Documentation:**
+- `DEVELOPMENT_LOG.md` - Full implementation history with Module 1 details (R1)
+- `R2_JOURNEY_DOCUMENTATION.md` - Complete R2 (Non-Catalog) journey documentation
+- `README.md` (this file) - Includes Procurement Module specifications
+
+**Requester Module (Journey R1 + R2):**
 - `src/types/workflow.ts` - Core type definitions (includes R2 types: JourneyType, QuoteDetails)
 - `src/modules/Requester/RequesterModuleV2.tsx` - Main orchestrator (1400+ lines, includes R2 lifecycle)
 - `src/components/workflow/Step1ChooseItems.tsx` - Stage 1 with R2 quote extraction
@@ -273,6 +331,17 @@ Next task: [what you want to implement]"
 - `src/data/catalogData.ts` - Golden catalog with 5 laptops (R1)
 - `src/data/accountingData.ts` - Accounting master data (includes Denmark data for R2)
 - `src/services/unifiedSearch.ts` - Natural language parsing logic
+
+**Procurement Module (PR/PO Workbench):**
+- `src/modules/Procurement/ProcurementModule.tsx` - Main workbench (1300+ lines, dual PR/PO views)
+- `src/components/PRPOFullDetail.tsx` - Detail view (1700+ lines, validation cockpit, actions)
+- `src/data/procurementData.ts` - Base PR/PO types and demo data (800+ lines)
+- `src/data/bbraunDemoData.ts` - BBraun-specific demo data (800+ lines)
+- `src/data/allProcurementData.ts` - Data aggregator (prevents circular dependencies)
+- `src/data/readiness.ts` - PR readiness evaluation logic
+- `src/data/conversion.ts` - PR→PO conversion mapping with checklist
+- `src/data/auditModel.ts` - Enhanced audit events with evidence links
+- `src/data/bbDemoReset.ts` - Demo reset functionality
 
 ## 🚢 Deployment
 
@@ -396,19 +465,312 @@ See [DEVELOPMENT_LOG.md](./DEVELOPMENT_LOG.md) Phase 12 for complete fix history
 
 ## 📊 Project Status
 
-**Current Version:** v2.0 - Journey R1 (Catalog) + Journey R2 (Non-Catalog) complete
+**Current Version:** v2.1 - Requester Module (R1 + R2) + Procurement Module complete
 **Build Status:** ✅ Passing (TypeScript + Vite)
-**Last Updated:** 2026-01-14
+**Last Updated:** 2026-01-23
 **Recent Features:**
-- **Journey R2 Complete** - Non-catalog workflow with quote extraction, buyer action step (NEW!)
-- Denmark-specific master data (6 cost centers, 5 GL accounts, 3 commodity groups) (NEW!)
-- Complete journey separation (R1 and R2 fully isolated) (NEW!)
+- **Procurement Module Complete** - PR/PO workbench with BBraun R2 Happy Flow (NEW!)
+  - Dual workbench (PR + PO management)
+  - BBraun operational procurement demo (PL568T surgical clips, EUR 140K)
+  - PR→PO conversion with readiness evaluation
+  - Dispatch flow with EKES supplier confirmation
+  - Validation cockpit with 11 checks
+  - Audit trail with evidence links (info records, PO history, EKES confirmations)
+  - Traceability: PR↔PO bidirectional linking
+  - Demo reset functionality
+  - Safety guardrails (duplicate prevention, state validation)
+- **Journey R2 Complete** - Non-catalog workflow with quote extraction, buyer action step
+- Denmark-specific master data (6 cost centers, 5 GL accounts, 3 commodity groups)
+- Complete journey separation (R1 and R2 fully isolated)
 - Golden catalog demo pack with 5 laptops (R1)
 - Natural language date/location parsing (R1)
 - Chat shortcuts (cheapest, fastest, best offer) (R1)
 - Complete workflow Phases 1-5 (both journeys)
 - My Requests tab in Phase 5 (both journeys)
 - Vercel deployment ready
+
+## 🏢 Procurement Module (Buyer/Procurement Team View)
+
+### Overview
+
+The **Procurement Module** (`src/modules/Procurement/ProcurementModule.tsx`) is the operational workbench for buyers and procurement specialists to process Purchase Requests (PRs) and manage Purchase Orders (POs). This module implements dual workbenches with intelligent triage, validation cockpits, and demo flows including the **BBraun R2 Happy Flow** for operational procurement.
+
+### Module Architecture
+
+```
+src/modules/Procurement/
+└── ProcurementModule.tsx    # Main procurement workbench (1300+ lines)
+
+src/components/
+└── PRPOFullDetail.tsx        # Detail view for PR/PO (1700+ lines)
+
+src/data/
+├── procurementData.ts        # Base PR/PO types and demo data
+├── bbraunDemoData.ts         # BBraun-specific demo data
+├── allProcurementData.ts     # Combined data aggregator (prevents circular deps)
+├── readiness.ts              # PR readiness evaluation logic
+├── conversion.ts             # PR→PO conversion mapping
+├── auditModel.ts             # Enhanced audit events with evidence links
+└── bbDemoReset.ts            # Demo reset functionality
+```
+
+### Key Components
+
+#### 1. **Dual Workbench Interface**
+- **PR Workbench**: Process incoming purchase requests
+- **PO Workbench**: Manage purchase orders (dispatch, confirmation, change management)
+- **Intelligent Filtering**: Views for "Attention Needed", "Unassigned", "SLA Risk", "My Queue"
+- **Smart Triage**: AI-powered chat assistant for workbench navigation
+
+#### 2. **PR Workbench Features**
+- **Phase Tracking**: Gatekeep → Reviews → Approvals → Ready for PO → Handoff
+- **Blocker Detection**: Automatic identification of incomplete fields
+- **Validation Cockpit**: Real-time checks for mandatory fields, compliance
+- **Convert to PO**: One-click conversion with readiness evaluation
+- **Assignment Management**: Assign to buyers or resolver queues
+
+#### 3. **PO Workbench Features**
+- **Lifecycle Management**: Create/Post → Dispatch → Confirm → Change → Close
+- **Dispatch Flow**: Send POs to suppliers via EDI/IDOC (simulated)
+- **Supplier Confirmation (EKES)**: Receive and validate supplier acknowledgments
+- **Change Management**: Handle PO amendments and revisions
+- **Release/Approval Trace**: Multi-level approval workflow with SLA tracking
+
+### BBraun R2 Happy Flow (Operational Procurement)
+
+The **BBraun demo** showcases end-to-end operational procurement for surgical supplies:
+
+#### Demo Scenario
+- **Material**: PL568T - CLIP LIGATURE MED.LARGE (Surgical Clips)
+- **Supplier**: 1165336 (AESCULAP)
+- **Quantity**: 2,288 PAK (274,560 pieces - fixed lot sizing)
+- **Value**: EUR 140,940.80 (High-value procurement)
+- **Plant**: BBraun-DE01 Melsungen
+
+#### Flow Steps
+
+**Step 1: PR Ready for Conversion**
+- PR-4546245893 in "Ready for PO" state
+- All approvals complete (3-level: Operational → Purchasing → Compliance)
+- Readiness checks passed (material, quantity, pricing, accounting)
+- Linked PO chip shown in header once converted
+
+**Step 2: Convert PR to PO**
+- Click "Convert to PO" button in PR detail view
+- System validates PR readiness (mandatory fields, approvals)
+- Creates PO-4516638113 with deterministic mapping:
+  - Pricing from info record 5301133479
+  - Vendor, plant, purchasing group mapped
+  - Accounting assignment preserved
+  - Audit trail with evidence links
+- PR transitions to "Handoff to PO" phase
+- PO appears in PO workbench
+
+**Step 3: PO Validation**
+- **Validation Cockpit** shows 11 checks (all pass):
+  - Cost & Conditions: Price matches info record, amount calculation correct, commercial conditions defaulted
+  - Quantity: Lot sizing policy, UoM sanity checks
+  - Dates: Lead time plausibility (120 days)
+  - Specifications: Material PL568T valid
+  - Master Data: Vendor active, purchasing group, plant, commodity group, accounting assignment
+- **Release/Approval Trace**: 3-level approval (pre-recorded demo)
+  - Operational Buyer → Head of Purchasing → Compliance Manager
+
+**Step 4: Dispatch to Supplier**
+- Click "Send PO (demo)" button
+- PO transmitted to AESCULAP via EDI/IDOC (simulated)
+- Audit trail records dispatch events
+- Automatic EKES confirmation received (simulated 2 hours later)
+  - Confirmation type: AB (Acknowledgment)
+  - Confirmed qty: 2,288 PAK (no deviation)
+  - Confirmed delivery: 120 days (within tolerance)
+  - Delta checks passed
+- PO status: "Dispatched · Awaiting confirmation" → "Confirmed · Awaiting delivery"
+
+**Step 5: Traceability**
+- PR header shows "Linked PO: PO-4516638113" chip (clickable)
+- PO header shows "Source PR: PR-4546245893" chip (clickable)
+- Full audit trail on both PR and PO with evidence links
+- Evidence chips: Info Record 5301133479, Historical POs (18 on file), EKES Confirmation AB
+
+### Data Model
+
+#### ProcurementPR Interface
+```typescript
+interface ProcurementPR {
+  id: string;
+  prNumber: string;
+  title: string;
+  phaseStep: string;              // Workflow phase
+  topBlocker: string | null;      // Primary blocker if any
+  amount: number;
+  currency: string;
+  requester: string;
+  assigneeOrQueue: string;
+  linkedPoNumber?: string;        // PO created from this PR
+
+  // Accounting
+  deliveryLocation: string;
+  needByDate: string;
+  costCenter: string;
+  glAccount: string;
+  commodityGroup: string;
+
+  // Line items
+  lineItems: Array<{
+    id: string;
+    description: string;
+    quantity: number;
+    unitPrice: number;
+  }>;
+
+  // Audit trail
+  auditTrail: AuditEvent[];
+}
+```
+
+#### ProcurementPO Interface
+```typescript
+interface ProcurementPO {
+  id: string;
+  poNumber: string;
+  supplier: string;
+  phaseStep: string;              // Workflow phase
+  amount: number;
+  currency: string;
+  sourcePrNumber?: string;        // PR that created this PO
+
+  // Dispatch
+  dispatchMethod: string;         // EDI/IDOC, Email, Portal, etc.
+  dispatchStatus: string;         // Ready to send, Sent, Failed
+
+  // Confirmation (EKES)
+  confirmationStatus: string;     // WAITING, RECEIVED, DEVIATION
+  confirmedQuantity?: number;
+  confirmedDeliveryDate?: string;
+  confirmationNote?: string;
+
+  // Validation
+  failureReason?: string;
+
+  // Audit trail
+  auditTrail: AuditEvent[];
+}
+```
+
+#### AuditEvent with Evidence Links
+```typescript
+interface AuditEvent {
+  id: string;
+  timestamp: Date;
+  action: string;
+  actor: string;
+  details?: string;
+  keyDiff?: string;               // Key changes summary
+  evidenceLinks?: AuditEvidence[]; // NEW: Evidence attachments
+}
+
+interface AuditEvidence {
+  type: 'info-record' | 'po-history' | 'ekes-confirmation' | 'rule-snapshot' | 'document';
+  label: string;
+  reference: string;
+  onClick?: () => void;
+}
+```
+
+### Helper Modules
+
+#### 1. **Readiness Evaluation** (`src/data/readiness.ts`)
+Deterministic PR readiness checks:
+```typescript
+evaluatePrReadiness(pr: ProcurementPR): ReadinessResult {
+  // Checks: material, quantity, UOM, delivery date, commodity, cost center, location
+  // Returns: isReadyForPo, blockers[], topBlocker, readinessChecks[]
+}
+```
+
+#### 2. **PR→PO Conversion** (`src/data/conversion.ts`)
+Mapping contract with checklist validation:
+```typescript
+convertBBraunPrToPo(pr: ProcurementPR): ConversionResult {
+  // Creates PO with NO blank fields
+  // Checklist: PO number, vendor, plant, pricing, info record, accounting
+  // Returns: { po: ProcurementPO, auditEvents: AuditEvent[] }
+}
+```
+
+#### 3. **Audit Trail Hardening** (`src/data/auditModel.ts`)
+Enhanced audit events with evidence:
+```typescript
+createConversionAudit(prNumber, poNumber): EnhancedAuditEvent[]
+createDispatchAudit(poNumber): EnhancedAuditEvent[]
+createConfirmationAudit(): EnhancedAuditEvent[]
+```
+
+#### 4. **Demo Reset** (`src/data/bbDemoReset.ts`)
+Reset BBraun demo to initial state:
+```typescript
+resetBBraunPR(currentPr): ProcurementPR      // Reset to "Ready for PO"
+removeBBraunPO(poList): ProcurementPO[]     // Remove created PO
+isBBraunDemoInitial(pr, poList): boolean    // Check if in initial state
+```
+
+### Safety Guardrails
+
+**Convert to PO:**
+- ✅ Disabled if PR not in "Ready for PO" state
+- ✅ Readiness evaluation blocks conversion if mandatory fields missing
+- ✅ Duplicate PO prevention
+- ✅ Toast notification explaining blockers
+
+**Dispatch PO:**
+- ✅ Only visible when dispatchStatus = "Ready to send"
+- ✅ Prevents duplicate dispatch with toast error
+- ✅ Automatic state sync across workbenches
+
+### Evidence & Traceability
+
+**Evidence Links in Audit Trail:**
+- Info Record 5301133479 (pricing source)
+- Historical POs (18 on file for material PL568T)
+- EKES Confirmation AB (supplier acknowledgment)
+- Rule snapshots (approval matrix, policy versions)
+
+**Clickable Navigation:**
+- PR ↔ PO bidirectional linking via header chips
+- Evidence chips in audit trail
+- Contract references
+
+### Technical Implementation Notes
+
+**Circular Dependency Prevention:**
+- Use `import type` for type-only imports
+- Always import from `allProcurementData.ts` in components
+- See `src/data/README.md` for details
+
+**State Management:**
+- In-memory state with React useState hooks
+- Workbench tables auto-update via state changes
+- Detail views sync with workbench state
+
+**Demo Simulation:**
+- No real backend - all simulated client-side
+- EKES confirmation instant (simulated 2-hour delay in audit trail)
+- Approval workflows pre-recorded
+
+### Key Files
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `ProcurementModule.tsx` | 1300+ | Main workbench with PR/PO tables |
+| `PRPOFullDetail.tsx` | 1700+ | Detail view with validation, actions |
+| `procurementData.ts` | 800+ | Base types and demo data |
+| `bbraunDemoData.ts` | 800+ | BBraun-specific data and workflows |
+| `allProcurementData.ts` | 40 | Data aggregator (prevents circular deps) |
+| `readiness.ts` | 150+ | PR readiness evaluation |
+| `conversion.ts` | 200+ | PR→PO conversion mapping |
+| `auditModel.ts` | 150+ | Enhanced audit with evidence |
+| `bbDemoReset.ts` | 80+ | Demo reset functionality |
 
 ## 🗺️ Next Steps (Potential)
 

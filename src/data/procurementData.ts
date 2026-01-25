@@ -1,6 +1,19 @@
 // ============================================================================
 // PROCUREMENT CONSOLE DEMO DATASET
 // ============================================================================
+//
+// NOTE: This file defines base types and standard demo data.
+// For BBraun-specific data, see bbraunDemoData.ts
+// Components should import from allProcurementData.ts (not this file directly)
+//
+// ============================================================================
+
+export interface AuditEvidence {
+  type: 'info-record' | 'po-history' | 'ekes-confirmation' | 'rule-snapshot' | 'document';
+  label: string;
+  reference: string;
+  onClick?: () => void;
+}
 
 export interface AuditEvent {
   id: string;
@@ -11,6 +24,7 @@ export interface AuditEvent {
   // Step 6: Key diffs for demo polish
   keyDiff?: string; // e.g., "Cost center changed: CC-RO-??? → CC-RO-BUCH-ENG"
   evidenceLabel?: string; // e.g., "Rule snapshot", "Transmission log"
+  evidenceLinks?: AuditEvidence[]; // Step 8: Evidence links for hardening
 }
 
 export interface ProcurementPR {
@@ -746,6 +760,12 @@ export function getPOReason(po: ProcurementPO): string | null {
   if (po.phaseStep === "Dispatch" && po.dispatchStatus === "Ready to send") {
     return "Ready to send";
   }
+  if (po.phaseStep === "Dispatch" && po.dispatchStatus === "Sent" && po.confirmationStatus === "RECEIVED") {
+    return "Confirmed · Awaiting delivery";
+  }
+  if (po.phaseStep === "Dispatch" && po.dispatchStatus === "Sent") {
+    return "Dispatched · Awaiting confirmation";
+  }
   if (po.phaseStep === "Close" && po.closeStatus === "CLOSED_DEMO") {
     return "Closed";
   }
@@ -762,6 +782,12 @@ export function getPONextAction(po: ProcurementPO): string | null {
   }
   if (po.phaseStep === "Dispatch" && po.dispatchStatus === "Ready to send") {
     return "Send PO to supplier";
+  }
+  if (po.phaseStep === "Dispatch" && po.dispatchStatus === "Sent" && po.confirmationStatus === "RECEIVED") {
+    return "Monitor delivery"; // BBraun happy flow - confirmed, awaiting delivery
+  }
+  if (po.phaseStep === "Dispatch" && po.dispatchStatus === "Sent") {
+    return "Awaiting supplier confirmation";
   }
   if (po.confirmationStatus === "RECEIVED") {
     return "Continue to close";

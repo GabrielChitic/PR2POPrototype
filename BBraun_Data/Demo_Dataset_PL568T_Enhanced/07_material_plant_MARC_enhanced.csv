@@ -1,0 +1,2 @@
+Material,Plant,Purch_Group,Planned_Deliv_Time,GR_Processing_Time,Lot_Sizing_Procedure,Procurement_Type,Special_Procurement,Safety_Stock,Fixed_Lot_Size,Maximum_Stock,MRP_Group
+PL568T,DE01,7EF,120,3,FX,F,,"      30.440,000","      45.760,000","     164.340,000",FP42

@@ -1,0 +1,27 @@
+{
+  "material": "PL568T",
+  "description": "CLIP LIGATURE MED.LARGE 20MAGAS.=120PCS.",
+  "vendor": 1165336,
+  "purchasing_group": "7EF",
+  "plant": "DE01",
+  "fixed_lot_size": "45,760",
+  "safety_stock": "30,440",
+  "lead_time_days": 120,
+  "price_per_pak": 61.6,
+  "standard_order": "2,288 PAK = EUR 140,940.80",
+  "files_included": [
+    "01_purchase_requisitions_EBAN_enhanced.csv (32 PRs)",
+    "02_purchase_orders_EKKO.csv (18 POs)",
+    "04_vendor_confirmations_EKES.csv (2 confirmations)",
+    "07_material_plant_MARC_enhanced.csv (MRP/planning data)",
+    "08_purchase_info_records_EINA.csv (pricing)",
+    "10_warehouse_stock_MB52.csv (stock levels)"
+  ],
+  "new_fields_added": [
+    "Purchase Requisitions (32 PRs with valuation prices)",
+    "Fixed Lot Size: 45,760 (your reference quantity!)",
+    "Safety Stock: 30,440",
+    "Lead Time: 120 days",
+    "MRP Group and procurement settings"
+  ]
+}

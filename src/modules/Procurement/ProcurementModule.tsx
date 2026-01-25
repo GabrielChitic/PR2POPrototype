@@ -27,8 +27,8 @@ import { Badge } from "../../components/ui/badge";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { cn } from "../../lib/utils";
 import {
-  DEMO_PRS,
-  DEMO_POS,
+  ALL_DEMO_PRS,
+  ALL_DEMO_POS,
   type ProcurementPR,
   type ProcurementPO,
   type AuditEvent,
@@ -38,9 +38,16 @@ import {
   getPRNextAction,
   getPOReason,
   getPONextAction,
-} from "../../data/procurementData";
+  evaluatePrReadiness,
+  convertBBraunPrToPo,
+  resetBBraunPR,
+  removeBBraunPO,
+  isBBraunDemoInitial,
+  getResetStatusMessage,
+} from "../../data/allProcurementData";
 import { PRPOFullDetail } from "../../components/PRPOFullDetail";
 import { isValidCostCenter } from "../../data/costCenterData";
+import { useToast } from "../../hooks/use-toast";
 
 type WorkbenchTab = "pr" | "po";
 type ViewFilter = "all" | "attention" | "unassigned" | "sla-risk" | "my-queue";
@@ -52,12 +59,13 @@ interface QuickFilter {
 }
 
 export function ProcurementModule() {
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<WorkbenchTab>("pr");
   const [selectedView, setSelectedView] = useState<ViewFilter>("all");
   const [quickFilters, setQuickFilters] = useState<QuickFilter[]>([
-    { id: "unassigned", label: "Unassigned", active: false },
-    { id: "sla-breached", label: "SLA breached", active: false },
-    { id: "holds", label: "Holds", active: false },
+    { id: "breached", label: "Breached", active: false },
+    { id: "at-risk", label: "At risk", active: false },
+    { id: "on-hold", label: "On hold", active: false },
     { id: "exceptions", label: "Exceptions", active: false },
     { id: "high-value", label: "High value", active: false },
   ]);
@@ -83,8 +91,8 @@ export function ProcurementModule() {
   const [fullDetailTab, setFullDetailTab] = useState<"overview" | "details" | "audit" | "collaboration">("overview");
 
   // Demo data state (mutable for assign actions)
-  const [prs, setPrs] = useState<ProcurementPR[]>(DEMO_PRS);
-  const [pos, setPos] = useState<ProcurementPO[]>(DEMO_POS);
+  const [prs, setPrs] = useState<ProcurementPR[]>(ALL_DEMO_PRS);
+  const [pos, setPos] = useState<ProcurementPO[]>(ALL_DEMO_POS);
 
   const toggleQuickFilter = (id: string) => {
     setQuickFilters((prev) =>
@@ -127,13 +135,13 @@ export function ProcurementModule() {
     const activeFilters = quickFilters.filter((f) => f.active);
     activeFilters.forEach((filter) => {
       switch (filter.id) {
-        case "unassigned":
-          filtered = filtered.filter((pr) => pr.unassigned);
-          break;
-        case "sla-breached":
+        case "breached":
           filtered = filtered.filter((pr) => pr.slaBreached);
           break;
-        case "holds":
+        case "at-risk":
+          filtered = filtered.filter((pr) => getPRSlaStatus(pr) === "At risk");
+          break;
+        case "on-hold":
           filtered = filtered.filter((pr) => pr.hold);
           break;
         case "exceptions":
@@ -181,13 +189,13 @@ export function ProcurementModule() {
     const activeFilters = quickFilters.filter((f) => f.active);
     activeFilters.forEach((filter) => {
       switch (filter.id) {
-        case "unassigned":
-          filtered = filtered.filter((po) => po.unassigned);
-          break;
-        case "sla-breached":
+        case "breached":
           filtered = filtered.filter((po) => po.slaBreached);
           break;
-        case "holds":
+        case "at-risk":
+          filtered = filtered.filter((po) => getPOSlaStatus(po) === "At risk");
+          break;
+        case "on-hold":
           filtered = filtered.filter((po) => po.hold);
           break;
         case "exceptions":
@@ -232,6 +240,39 @@ export function ProcurementModule() {
     setShowFullDetail(false);
     setFullDetailPR(null);
     setFullDetailPO(null);
+  };
+
+  // Navigate between linked PR ↔ PO
+  const handleNavigateToLinkedObject = (type: 'PR' | 'PO', number: string) => {
+    if (type === 'PR') {
+      const linkedPr = prs.find(p => p.prNumber === number);
+      if (linkedPr) {
+        setFullDetailPR(linkedPr);
+        setFullDetailPO(null);
+        setFullDetailTab("overview");
+        // showFullDetail remains true
+      } else {
+        toast({
+          title: "PR Not Found",
+          description: `Could not find PR ${number}`,
+          variant: "destructive"
+        });
+      }
+    } else if (type === 'PO') {
+      const linkedPo = pos.find(p => p.poNumber === number);
+      if (linkedPo) {
+        setFullDetailPO(linkedPo);
+        setFullDetailPR(null);
+        setFullDetailTab("overview");
+        // showFullDetail remains true
+      } else {
+        toast({
+          title: "PO Not Found",
+          description: `Could not find PO ${number}`,
+          variant: "destructive"
+        });
+      }
+    }
   };
 
   const handleAssignPR = (prId: string, assignee: string) => {
@@ -402,7 +443,61 @@ export function ProcurementModule() {
   // Convert PR to PO
   const handleConvertToPO = (prId: string) => {
     const pr = prs.find((p) => p.id === prId);
-    if (!pr || pr.phaseStep !== "Ready for PO") return;
+    if (!pr) return;
+
+    // Check readiness for BBraun PR
+    if (pr.prNumber === "PR-4546245893") {
+      const readiness = evaluatePrReadiness(pr);
+
+      if (!readiness.isReadyForPo) {
+        toast({
+          title: "Cannot Convert to PO",
+          description: `PR is not ready: ${readiness.topBlocker}`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Use conversion mapper for BBraun PR
+      const conversionResult = convertBBraunPrToPo(pr);
+      const { po: newPO, auditEvents } = conversionResult;
+
+      // Update PR to Handoff state with linkage
+      const updatedPR: ProcurementPR = {
+        ...pr,
+        phaseStep: "Handoff to PO",
+        linkedPoNumber: "PO-4516638113",
+        auditTrail: [
+          ...pr.auditTrail,
+          ...auditEvents
+        ],
+      };
+
+      // Add PO to state (prevents duplicate by checking if already exists)
+      setPos((prev) => {
+        const exists = prev.some(p => p.poNumber === "PO-4516638113");
+        if (exists) {
+          return prev; // Don't add duplicate
+        }
+        return [...prev, newPO];
+      });
+
+      // Update PR in state
+      setPrs((prev) => prev.map((p) => (p.id === prId ? updatedPR : p)));
+
+      // Update detail views
+      if (fullDetailPR && fullDetailPR.id === prId) {
+        setFullDetailPR(updatedPR);
+      }
+
+      // Show toast
+      toast({
+        title: "PO Created Successfully",
+        description: "PO-4516638113 has been created and is ready for dispatch. Check the PO workbench.",
+      });
+
+      return;
+    }
 
     // Generate new PO number
     const newPoNumber = `PO-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -588,14 +683,105 @@ export function ProcurementModule() {
   // Dispatch PO
   const handleDispatchPO = (poId: string) => {
     const po = pos.find((p) => p.id === poId);
-    if (!po || po.dispatchStatus !== "Ready to send") return;
+    if (!po) return;
 
+    // Safety check: prevent duplicate dispatch
+    if (po.dispatchStatus !== "Ready to send") {
+      toast({
+        title: "Cannot Dispatch PO",
+        description: po.dispatchStatus === "Sent"
+          ? "PO has already been dispatched to supplier"
+          : "PO is not ready for dispatch",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const now = new Date();
+
+    // BBraun Step 4 + 5: Dispatch to Sent, then show confirmation
+    if (po.poNumber === "PO-4516638113") {
+      const updatedPO: ProcurementPO = {
+        ...po,
+        phaseStep: "Dispatch",
+        dispatchStatus: "Sent",
+        dispatchAttemptCount: 1,
+        dispatchLastAttemptAt: now,
+        // Step 5: Add confirmation status (simulated instant confirmation for demo)
+        confirmationStatus: "RECEIVED",
+        confirmedDeliveryDate: new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 120 days
+        confirmedQuantityDelta: 0,
+        confirmationNote: "Supplier confirmed order as requested. No deviations.",
+        auditTrail: [
+          ...po.auditTrail,
+          {
+            id: `audit-bbraun-dispatch-${Date.now()}`,
+            timestamp: now,
+            action: "Dispatch triggered (demo)",
+            actor: "Emily Rodriguez",
+            details: "User initiated PO dispatch to supplier",
+          },
+          {
+            id: `audit-bbraun-dispatch-${Date.now() + 1}`,
+            timestamp: new Date(now.getTime() + 1000),
+            action: "PO sent to supplier (demo channel)",
+            actor: "System",
+            details: "PO transmitted to AESCULAP via EDI/IDOC (demo simulation)",
+            keyDiff: "Dispatch method: EDI/IDOC, Supplier: 1165336 (AESCULAP)"
+          },
+          {
+            id: `audit-bbraun-dispatch-${Date.now() + 2}`,
+            timestamp: new Date(now.getTime() + 2000),
+            action: "Awaiting supplier confirmation",
+            actor: "System",
+            details: "PO successfully dispatched, waiting for supplier acknowledgment",
+          },
+          {
+            id: `audit-bbraun-ekes-${Date.now() + 3}`,
+            timestamp: new Date(now.getTime() + 2 * 60 * 60 * 1000), // 2 hours later (simulated)
+            action: "Supplier confirmation received (EKES)",
+            actor: "System",
+            details: "Confirmation type AB (Acknowledgment) received from AESCULAP",
+            keyDiff: "Confirmed qty: 2,288 PAK · Confirmed delivery: 120 days · Status: Confirmed",
+            evidenceLinks: [
+              {
+                type: 'ekes-confirmation',
+                label: 'EKES Confirmation AB',
+                reference: 'ekes-bbraun-001'
+              }
+            ]
+          },
+          {
+            id: `audit-bbraun-validation-${Date.now() + 4}`,
+            timestamp: new Date(now.getTime() + 2 * 60 * 60 * 1000 + 1000),
+            action: "Confirmation validated",
+            actor: "System",
+            details: "Delta check passed: Qty matches, date within policy tolerance",
+            keyDiff: "No deviations detected"
+          },
+        ],
+      };
+
+      setPos((prev) => prev.map((p) => (p.id === poId ? updatedPO : p)));
+
+      if (fullDetailPO && fullDetailPO.id === poId) {
+        setFullDetailPO(updatedPO);
+      }
+
+      toast({
+        title: "PO Dispatched & Confirmed",
+        description: "PO-4516638113 has been sent to AESCULAP. Supplier confirmation received.",
+      });
+
+      return;
+    }
+
+    // Generic dispatch for other POs - advance to Confirm phase
     const updatedPO: ProcurementPO = {
       ...po,
       dispatchStatus: "Sent",
       dispatchAttemptCount: (po.dispatchAttemptCount || 0) + 1,
       dispatchLastAttemptAt: new Date(),
-      // Step 5: After successful dispatch, advance to Confirm and wait for confirmation
       phaseStep: "Confirm",
       confirmationStatus: "RECEIVED", // For happy path demo, auto-receive
       confirmedDeliveryDate: po.needByDate, // Matches request
@@ -827,6 +1013,41 @@ export function ProcurementModule() {
     if (fullDetailPO && fullDetailPO.id === poId) {
       setFullDetailPO(updatedPO);
     }
+  };
+
+  // Reset BBraun demo state
+  const handleResetBBraunDemo = () => {
+    const bbraunPr = prs.find(p => p.prNumber === "PR-4546245893");
+
+    if (!bbraunPr) {
+      toast({
+        title: "BBraun PR not found",
+        description: "Cannot reset demo state",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Reset PR to initial state
+    const resetPr = resetBBraunPR(bbraunPr);
+    setPrs((prev) => prev.map((p) => p.prNumber === "PR-4546245893" ? resetPr : p));
+
+    // Remove PO from list
+    setPos((prev) => removeBBraunPO(prev));
+
+    // Clear detail views if showing BBraun items
+    if (fullDetailPR && fullDetailPR.prNumber === "PR-4546245893") {
+      setFullDetailPR(resetPr);
+    }
+    if (fullDetailPO && fullDetailPO.poNumber === "PO-4516638113") {
+      setFullDetailPO(null);
+      setShowFullDetail(false);
+    }
+
+    toast({
+      title: "BBraun Demo Reset",
+      description: "PR-4546245893 returned to 'Ready for PO' state, PO removed",
+    });
   };
 
   // Step 7: Assistant command handler
@@ -1065,29 +1286,54 @@ export function ProcurementModule() {
       onAcceptChange={handleAcceptChange}
       onRejectChange={handleRejectChange}
       onCloseDemo={handleCloseDemo}
+      onNavigateToLinkedObject={handleNavigateToLinkedObject}
     />;
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-muted/20">
+    <div className="flex-1 flex flex-col overflow-hidden bg-muted/30">
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden p-4">
         {/* Primary Workspace Card */}
         <Card className="flex-1 flex flex-col shadow-lg border-border/50">
           {/* Header */}
           <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-8 py-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Filter className="h-5 w-5 text-primary" />
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Filter className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                    Procurement Console
+                  </h1>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Triage requests and orders across systems
+                  </p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-                  Procurement Console
-                </h1>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  Triage requests and orders across systems
-                </p>
-              </div>
+
+              {/* Demo Controls */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-9 w-9">
+                    <Settings2 className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={handleResetBBraunDemo}>
+                    <div className="flex flex-col gap-1">
+                      <div className="font-medium">Reset BBraun Demo</div>
+                      <div className="text-xs text-muted-foreground">
+                        {getResetStatusMessage(
+                          prs.find(p => p.prNumber === "PR-4546245893"),
+                          pos
+                        )}
+                      </div>
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
@@ -1100,20 +1346,20 @@ export function ProcurementModule() {
             <div className="border-b bg-background/95 px-8">
               <TabsList className="bg-transparent">
                 <TabsTrigger value="pr" className="data-[state=active]:bg-background">
-                  PR Workbench (Requests)
+                  Requests
                 </TabsTrigger>
                 <TabsTrigger value="po" className="data-[state=active]:bg-background">
-                  PO Workbench (Orders)
+                  Orders
                 </TabsTrigger>
               </TabsList>
             </div>
 
             {/* Shared Controls Row */}
-            <div className="border-b bg-background/95 px-8 py-4">
-              <div className="flex items-center gap-4 flex-wrap">
-                {/* Views Dropdown */}
+            <div className="border-b bg-background/95 px-8 py-4 space-y-3">
+              {/* Row A: Saved views (left) + Search placeholder (right) */}
+              <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Views:</span>
+                  <span className="text-sm text-muted-foreground">Saved views:</span>
                   <Select value={selectedView} onValueChange={(value: string) => setSelectedView(value as ViewFilter)}>
                     <SelectTrigger className="w-[180px]">
                       <SelectValue />
@@ -1127,32 +1373,28 @@ export function ProcurementModule() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
 
-                {/* Divider */}
-                <div className="h-6 w-px bg-border" />
-
-                {/* Quick Filter Chips */}
+              {/* Row B: Filter chips (left) + Columns (right) */}
+              <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2 flex-wrap">
                   {quickFilters.map((filter) => (
-                    <Badge
+                    <Button
                       key={filter.id}
-                      variant={filter.active ? "default" : "outline"}
+                      variant={filter.active ? "default" : "secondary"}
+                      size="sm"
                       className={cn(
-                        "cursor-pointer hover:bg-primary/10 transition-colors",
-                        filter.active && "bg-primary text-primary-foreground"
+                        "gap-1.5",
+                        filter.active && "bg-primary text-primary-foreground hover:bg-primary/90"
                       )}
                       onClick={() => toggleQuickFilter(filter.id)}
                     >
                       {filter.label}
-                      {filter.active && <X className="ml-1 h-3 w-3" />}
-                    </Badge>
+                      {filter.active && <X className="h-3 w-3" />}
+                    </Button>
                   ))}
                 </div>
 
-                {/* Divider */}
-                <div className="h-6 w-px bg-border" />
-
-                {/* Columns Button */}
                 <Button variant="outline" size="sm" className="gap-2">
                   <Settings2 className="h-4 w-4" />
                   Columns
@@ -1173,25 +1415,24 @@ export function ProcurementModule() {
                             PR #
                           </th>
                           <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
-                            Title / Line summary
+                            Title
                           </th>
                           <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
-                            Phase / Step
+                            Stage
                           </th>
                           <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
-                            Reason
+                            Attention
                           </th>
                           <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
-                            Age / SLA
+                            SLA
                           </th>
-                          <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
+                          <th className="text-right px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
                             Amount
                           </th>
                           <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
-                            Assignee / Queue
+                            Owner
                           </th>
-                          <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
-                            Actions
+                          <th className="text-right px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap w-16">
                           </th>
                         </tr>
                       </thead>
@@ -1230,26 +1471,31 @@ export function ProcurementModule() {
                               onClick={() => handleRowClickPR(pr)}
                             >
                               {/* PR # */}
-                              <td className="px-4 py-3 text-sm font-medium text-foreground">
-                                {pr.prNumber}
+                              <td className="px-4 py-3.5">
+                                <div className="text-sm font-semibold text-foreground leading-tight">
+                                  {pr.prNumber}
+                                </div>
+                                <div className="text-xs text-muted-foreground mt-1 leading-tight">
+                                  {pr.entityCode}
+                                </div>
                               </td>
-                              {/* Title / Line summary - Step 6A: Two-line pattern */}
-                              <td className="px-4 py-3 max-w-xs">
-                                <div className="text-sm font-medium text-foreground leading-tight">
+                              {/* Title */}
+                              <td className="px-4 py-3.5 max-w-xs">
+                                <div className="text-sm font-semibold text-foreground leading-tight truncate">
                                   {pr.title}
                                 </div>
                                 <div className="text-xs text-muted-foreground mt-1 leading-tight">
                                   {pr.requester}
                                 </div>
                               </td>
-                              {/* Phase / Step */}
-                              <td className="px-4 py-3 text-sm">
+                              {/* Stage */}
+                              <td className="px-4 py-3.5">
                                 <Badge variant="outline" className="text-xs">
                                   {pr.phaseStep}
                                 </Badge>
                               </td>
-                              {/* Reason / Next Action - Step 6A: Clean compact format */}
-                              <td className="px-4 py-3">
+                              {/* Attention */}
+                              <td className="px-4 py-3.5">
                                 {getPRReason(pr) ? (
                                   <div>
                                     <Badge
@@ -1268,16 +1514,16 @@ export function ProcurementModule() {
                                   <span className="text-xs text-muted-foreground">—</span>
                                 )}
                               </td>
-                              {/* Age / SLA - Step 6A: Single-line format */}
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-                                  <span>{pr.age}</span>
+                              {/* SLA */}
+                              <td className="px-4 py-3.5">
+                                <div className="flex items-center gap-1.5 text-sm">
+                                  <span className="text-foreground">{pr.age}</span>
                                   <span className="text-muted-foreground">·</span>
                                   <span
                                     className={cn(
                                       "text-xs",
-                                      getPRSlaStatus(pr) === "Breached" && "text-red-600",
-                                      getPRSlaStatus(pr) === "At risk" && "text-amber-600",
+                                      getPRSlaStatus(pr) === "Breached" && "text-red-600 font-medium",
+                                      getPRSlaStatus(pr) === "At risk" && "text-amber-600 font-medium",
                                       getPRSlaStatus(pr) === "On track" && "text-muted-foreground"
                                     )}
                                   >
@@ -1285,12 +1531,12 @@ export function ProcurementModule() {
                                   </span>
                                 </div>
                               </td>
-                              {/* Amount - Step 6A: Consistent typography */}
-                              <td className="px-4 py-3 text-sm font-medium text-foreground">
+                              {/* Amount */}
+                              <td className="px-4 py-3.5 text-right text-sm font-semibold text-foreground">
                                 {pr.currency} {pr.amount.toLocaleString()}
                               </td>
-                              {/* Assignee / Queue - Step 6A: Simplified */}
-                              <td className="px-4 py-3">
+                              {/* Owner */}
+                              <td className="px-4 py-3.5">
                                 {pr.unassigned ? (
                                   <Badge variant="secondary" className="text-xs font-normal">
                                     Unassigned
@@ -1299,59 +1545,37 @@ export function ProcurementModule() {
                                   <span className="text-sm text-foreground">{pr.assigneeOrQueue}</span>
                                 )}
                               </td>
-                              {/* Actions */}
-                              <td className="px-4 py-3 text-sm">
-                                <div className="flex items-center gap-2" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-8"
-                                    onClick={() => handleOpenPR(pr)}
-                                  >
-                                    Open
-                                  </Button>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                                        <User className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuItem
-                                        onClick={() => handleAssignPR(pr.id, "Emily Rodriguez")}
-                                      >
-                                        Assign to me
+                              {/* Actions Menu */}
+                              <td className="px-4 py-3.5 text-right">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                                    <DropdownMenuItem onClick={() => handleOpenPR(pr)}>
+                                      Open
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleAssignPR(pr.id, "Emily Rodriguez")}>
+                                      Assign to me
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem disabled>
+                                      Put on hold
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={handleRequestInfo}>
+                                      Add note
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem disabled>
+                                      View audit trail
+                                    </DropdownMenuItem>
+                                    {pr.phaseStep === "Ready for PO" && (
+                                      <DropdownMenuItem onClick={() => handleConvertToPO(pr.id)}>
+                                        Convert to PO
                                       </DropdownMenuItem>
-                                      <DropdownMenuItem
-                                        onClick={() => handleAssignPR(pr.id, "Unassigned")}
-                                      >
-                                        Unassign
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-8 w-8 p-0"
-                                    onClick={handleRequestInfo}
-                                  >
-                                    <MessageSquare className="h-4 w-4" />
-                                  </Button>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                                        <MoreVertical className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuItem disabled>
-                                        Apply suggested fix
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem disabled>Route</DropdownMenuItem>
-                                      <DropdownMenuItem disabled>Re-run checks</DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </div>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </td>
                             </tr>
                           ))
@@ -1376,22 +1600,21 @@ export function ProcurementModule() {
                             Supplier
                           </th>
                           <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
-                            Phase / Step
+                            Stage
                           </th>
                           <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
-                            Reason
+                            Attention
                           </th>
                           <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
-                            Age / SLA
+                            SLA
                           </th>
-                          <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
+                          <th className="text-right px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
                             Amount
                           </th>
                           <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
-                            Assignee / Resolver group
+                            Owner
                           </th>
-                          <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">
-                            Actions
+                          <th className="text-right px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap w-16">
                           </th>
                         </tr>
                       </thead>
@@ -1430,12 +1653,14 @@ export function ProcurementModule() {
                               onClick={() => handleRowClickPO(po)}
                             >
                               {/* PO # */}
-                              <td className="px-4 py-3 text-sm font-medium text-foreground">
-                                {po.poNumber}
+                              <td className="px-4 py-3.5">
+                                <div className="text-sm font-semibold text-foreground leading-tight">
+                                  {po.poNumber}
+                                </div>
                               </td>
-                              {/* Supplier - Step 6A: Two-line pattern */}
-                              <td className="px-4 py-3 max-w-xs">
-                                <div className="text-sm font-medium text-foreground leading-tight">
+                              {/* Supplier */}
+                              <td className="px-4 py-3.5 max-w-xs">
+                                <div className="text-sm font-semibold text-foreground leading-tight truncate">
                                   {po.supplier}
                                 </div>
                                 {po.sourcePrNumber && (
@@ -1444,14 +1669,14 @@ export function ProcurementModule() {
                                   </div>
                                 )}
                               </td>
-                              {/* Phase / Step */}
-                              <td className="px-4 py-3 text-sm">
+                              {/* Stage */}
+                              <td className="px-4 py-3.5">
                                 <Badge variant="outline" className="text-xs">
                                   {po.phaseStep}
                                 </Badge>
                               </td>
-                              {/* Reason / Next Action - Step 6A: Clean compact format */}
-                              <td className="px-4 py-3 max-w-xs">
+                              {/* Attention */}
+                              <td className="px-4 py-3.5">
                                 {getPOReason(po) ? (
                                   <div>
                                     <Badge
@@ -1476,16 +1701,16 @@ export function ProcurementModule() {
                                   <span className="text-xs text-muted-foreground">—</span>
                                 )}
                               </td>
-                              {/* Age / SLA - Step 6A: Single-line format */}
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-                                  <span>{po.age}</span>
+                              {/* SLA */}
+                              <td className="px-4 py-3.5">
+                                <div className="flex items-center gap-1.5 text-sm">
+                                  <span className="text-foreground">{po.age}</span>
                                   <span className="text-muted-foreground">·</span>
                                   <span
                                     className={cn(
                                       "text-xs",
-                                      getPOSlaStatus(po) === "Breached" && "text-red-600",
-                                      getPOSlaStatus(po) === "At risk" && "text-amber-600",
+                                      getPOSlaStatus(po) === "Breached" && "text-red-600 font-medium",
+                                      getPOSlaStatus(po) === "At risk" && "text-amber-600 font-medium",
                                       getPOSlaStatus(po) === "On track" && "text-muted-foreground"
                                     )}
                                   >
@@ -1493,12 +1718,12 @@ export function ProcurementModule() {
                                   </span>
                                 </div>
                               </td>
-                              {/* Amount - Step 6A: Consistent typography */}
-                              <td className="px-4 py-3 text-sm font-medium text-foreground">
+                              {/* Amount */}
+                              <td className="px-4 py-3.5 text-right text-sm font-semibold text-foreground">
                                 {po.currency} {po.amount.toLocaleString()}
                               </td>
-                              {/* Assignee / Resolver group - Step 6A: Simplified */}
-                              <td className="px-4 py-3">
+                              {/* Owner */}
+                              <td className="px-4 py-3.5">
                                 {po.unassigned ? (
                                   <Badge variant="secondary" className="text-xs font-normal">
                                     Unassigned
@@ -1507,59 +1732,42 @@ export function ProcurementModule() {
                                   <span className="text-sm text-foreground">{po.assigneeOrResolverGroup}</span>
                                 )}
                               </td>
-                              {/* Actions */}
-                              <td className="px-4 py-3 text-sm">
-                                <div className="flex items-center gap-2" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-8"
-                                    onClick={() => handleOpenPO(po)}
-                                  >
-                                    Open
-                                  </Button>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                                        <User className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuItem
-                                        onClick={() => handleAssignPO(po.id, "Emily Rodriguez")}
-                                      >
-                                        Assign to me
+                              {/* Actions Menu */}
+                              <td className="px-4 py-3.5 text-right">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                                    <DropdownMenuItem onClick={() => handleOpenPO(po)}>
+                                      Open
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleAssignPO(po.id, "Emily Rodriguez")}>
+                                      Assign to me
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={handleRequestInfo}>
+                                      Add note
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem disabled>
+                                      View audit trail
+                                    </DropdownMenuItem>
+                                    {po.dispatchStatus === "Ready to send" && (
+                                      <DropdownMenuItem onClick={() => handleDispatchPO(po.id)}>
+                                        Send PO (demo)
                                       </DropdownMenuItem>
-                                      <DropdownMenuItem
-                                        onClick={() => handleAssignPO(po.id, "Unassigned")}
-                                      >
-                                        Unassign
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-8 w-8 p-0"
-                                    onClick={handleRequestInfo}
-                                  >
-                                    <MessageSquare className="h-4 w-4" />
-                                  </Button>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                                        <MoreVertical className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
+                                    )}
+                                    {po.confirmationStatus === "RECEIVED" && (
                                       <DropdownMenuItem disabled>
-                                        Apply suggested fix
+                                        View confirmation
                                       </DropdownMenuItem>
-                                      <DropdownMenuItem disabled>Route</DropdownMenuItem>
-                                      <DropdownMenuItem disabled>Re-run checks</DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </div>
+                                    )}
+                                    <DropdownMenuItem disabled>
+                                      Create change / Amend
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </td>
                             </tr>
                           ))

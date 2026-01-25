@@ -11,8 +11,34 @@ export interface CostCenter {
   active: boolean;
 }
 
-// Valid cost centers for UIPATH-RO entity
+// Valid cost centers for all entities
 export const VALID_COST_CENTERS: CostCenter[] = [
+  // BBraun cost centers
+  {
+    code: "7200",
+    name: "Medical Supplies Department",
+    entity: "BBraun-DE01",
+    location: "Melsungen",
+    department: "Medical Supplies",
+    active: true,
+  },
+  {
+    code: "7100",
+    name: "Surgical Equipment",
+    entity: "BBraun-DE01",
+    location: "Melsungen",
+    department: "Surgical",
+    active: true,
+  },
+  {
+    code: "7300",
+    name: "Pharmaceuticals",
+    entity: "BBraun-DE01",
+    location: "Melsungen",
+    department: "Pharma",
+    active: true,
+  },
+  // UIPATH-RO cost centers
   {
     code: "CC-RO-BUCH-ENG",
     name: "Bucharest Engineering",

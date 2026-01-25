@@ -1,0 +1,514 @@
+{
+  "approval_matrix_version": "1.0",
+  "organization": "BBraun - Purchasing Organization DEA1",
+  "purchasing_group": "7EF - Surgical Supplies",
+  "plant": "DE01",
+  "currency": "EUR",
+  "effective_date": "2024-01-01",
+
+  "approval_limits": {
+    "description": "Based on actual BBraun 7EF value distribution and industry standards for medical procurement",
+
+    "pr_approval_matrix": [
+      {
+        "tier": 1,
+        "tier_name": "Standard",
+        "min_value": 0,
+        "max_value": 10000,
+        "approvers": [
+          {
+            "level": 1,
+            "role": "Operational Buyer",
+            "name": "Michael Schneider",
+            "employee_id": "EMP001234",
+            "title": "Operational Buyer - Surgical Supplies",
+            "email": "michael.schneider@bbraun.example.com",
+            "approval_limit": 10000,
+            "auto_approve": true,
+            "sla_hours": 4
+          }
+        ],
+        "applicable_to_pl568t": false,
+        "notes": "Single approval for routine purchases"
+      },
+      {
+        "tier": 2,
+        "tier_name": "Medium Value",
+        "min_value": 10000,
+        "max_value": 50000,
+        "approvers": [
+          {
+            "level": 1,
+            "role": "Operational Buyer",
+            "name": "Michael Schneider",
+            "employee_id": "EMP001234",
+            "title": "Operational Buyer - Surgical Supplies",
+            "approval_limit": 50000,
+            "auto_approve": false,
+            "sla_hours": 8
+          },
+          {
+            "level": 2,
+            "role": "Head of Operational Purchasing",
+            "name": "Dr. Andrea Weber",
+            "employee_id": "EMP000987",
+            "title": "Head of Operational Purchasing - Medical Devices",
+            "approval_limit": 50000,
+            "auto_approve": false,
+            "sla_hours": 24
+          }
+        ],
+        "applicable_to_pl568t": false,
+        "notes": "Two-level approval required"
+      },
+      {
+        "tier": 3,
+        "tier_name": "High Value",
+        "min_value": 50000,
+        "max_value": 150000,
+        "approvers": [
+          {
+            "level": 1,
+            "role": "Operational Buyer",
+            "name": "Michael Schneider",
+            "employee_id": "EMP001234",
+            "title": "Operational Buyer - Surgical Supplies",
+            "approval_limit": 150000,
+            "auto_approve": false,
+            "sla_hours": 8
+          },
+          {
+            "level": 2,
+            "role": "Head of Operational Purchasing",
+            "name": "Dr. Andrea Weber",
+            "employee_id": "EMP000987",
+            "title": "Head of Operational Purchasing - Medical Devices",
+            "approval_limit": 150000,
+            "auto_approve": false,
+            "sla_hours": 24
+          },
+          {
+            "level": 3,
+            "role": "Compliance Manager",
+            "name": "Stefan Hoffmann",
+            "employee_id": "EMP000654",
+            "title": "Compliance Manager - Procurement",
+            "approval_limit": 150000,
+            "auto_approve": false,
+            "sla_hours": 48
+          }
+        ],
+        "applicable_to_pl568t": true,
+        "notes": "Three-level approval with compliance review. PL568T orders (EUR 140,940.80) fall in this tier."
+      },
+      {
+        "tier": 4,
+        "tier_name": "Executive Approval",
+        "min_value": 150000,
+        "max_value": 999999999,
+        "approvers": [
+          {
+            "level": 1,
+            "role": "Operational Buyer",
+            "name": "Michael Schneider",
+            "employee_id": "EMP001234",
+            "title": "Operational Buyer - Surgical Supplies",
+            "approval_limit": 999999999,
+            "auto_approve": false,
+            "sla_hours": 8
+          },
+          {
+            "level": 2,
+            "role": "Head of Operational Purchasing",
+            "name": "Dr. Andrea Weber",
+            "employee_id": "EMP000987",
+            "title": "Head of Operational Purchasing - Medical Devices",
+            "approval_limit": 999999999,
+            "auto_approve": false,
+            "sla_hours": 24
+          },
+          {
+            "level": 3,
+            "role": "Compliance Manager",
+            "name": "Stefan Hoffmann",
+            "employee_id": "EMP000654",
+            "title": "Compliance Manager - Procurement",
+            "approval_limit": 999999999,
+            "auto_approve": false,
+            "sla_hours": 48
+          },
+          {
+            "level": 4,
+            "role": "Chief Procurement Officer",
+            "name": "Dr. Klaus Müller",
+            "employee_id": "EMP000123",
+            "title": "VP Global Procurement",
+            "approval_limit": 999999999,
+            "auto_approve": false,
+            "sla_hours": 72
+          }
+        ],
+        "applicable_to_pl568t": false,
+        "notes": "Four-level approval including executive sign-off for very high value PRs"
+      }
+    ],
+
+    "po_approval_matrix": [
+      {
+        "tier": 1,
+        "tier_name": "Auto-Approved",
+        "min_value": 0,
+        "max_value": 5000,
+        "approvers": [],
+        "applicable_to_pl568t": false,
+        "notes": "POs < EUR 5k with approved PRs are auto-released"
+      },
+      {
+        "tier": 2,
+        "tier_name": "Buyer Approval",
+        "min_value": 5000,
+        "max_value": 25000,
+        "approvers": [
+          {
+            "level": 1,
+            "role": "Operational Buyer",
+            "name": "Michael Schneider",
+            "employee_id": "EMP001234",
+            "title": "Operational Buyer - Surgical Supplies (7EF)",
+            "approval_limit": 25000,
+            "auto_approve": false,
+            "sla_hours": 4
+          }
+        ],
+        "applicable_to_pl568t": false,
+        "notes": "Single buyer approval"
+      },
+      {
+        "tier": 3,
+        "tier_name": "Manager Approval",
+        "min_value": 25000,
+        "max_value": 100000,
+        "approvers": [
+          {
+            "level": 1,
+            "role": "Operational Buyer",
+            "name": "Michael Schneider",
+            "employee_id": "EMP001234",
+            "title": "Operational Buyer - Surgical Supplies (7EF)",
+            "approval_limit": 100000,
+            "auto_approve": false,
+            "sla_hours": 4
+          },
+          {
+            "level": 2,
+            "role": "Head of Operational Purchasing",
+            "name": "Dr. Andrea Weber",
+            "employee_id": "EMP000987",
+            "title": "Head of Operational Purchasing - Medical Devices",
+            "approval_limit": 100000,
+            "auto_approve": false,
+            "sla_hours": 24
+          }
+        ],
+        "applicable_to_pl568t": false,
+        "notes": "Two-level PO release"
+      },
+      {
+        "tier": 4,
+        "tier_name": "Senior Management",
+        "min_value": 100000,
+        "max_value": 999999999,
+        "approvers": [
+          {
+            "level": 1,
+            "role": "Operational Buyer",
+            "name": "Michael Schneider",
+            "employee_id": "EMP001234",
+            "title": "Operational Buyer - Surgical Supplies (7EF)",
+            "approval_limit": 999999999,
+            "auto_approve": false,
+            "sla_hours": 4
+          },
+          {
+            "level": 2,
+            "role": "Head of Operational Purchasing",
+            "name": "Dr. Andrea Weber",
+            "employee_id": "EMP000987",
+            "title": "Head of Operational Purchasing - Medical Devices",
+            "approval_limit": 999999999,
+            "auto_approve": false,
+            "sla_hours": 24
+          },
+          {
+            "level": 3,
+            "role": "Compliance Manager",
+            "name": "Thomas Becker",
+            "employee_id": "EMP000321",
+            "title": "Compliance Manager - Strategic Sourcing",
+            "approval_limit": 999999999,
+            "auto_approve": false,
+            "sla_hours": 48
+          }
+        ],
+        "applicable_to_pl568t": true,
+        "notes": "Three-level PO release for high-value orders. PL568T POs (EUR 140,940.80) require this level."
+      }
+    ]
+  },
+
+  "pl568t_specific_workflow": {
+    "material": "PL568T",
+    "description": "CLIP LIGATURE MED.LARGE 20MAGAS.=120PCS.",
+    "standard_order_value": 140940.80,
+    "applicable_pr_tier": 3,
+    "applicable_po_tier": 4,
+
+    "pr_approval_flow": {
+      "total_approvers": 3,
+      "estimated_total_time_hours": 80,
+      "steps": [
+        {
+          "step": 1,
+          "approver": "Michael Schneider",
+          "role": "Operational Buyer - Surgical Supplies",
+          "action": "Operational Review & Sourcing",
+          "checks": [
+            "Verify material specification correct",
+            "Confirm fixed lot size (45,760 pieces)",
+            "Check preferred vendor (1165336 - AESCULAP)",
+            "Validate info record pricing (EUR 61.6/PAK)",
+            "Confirm delivery lead time (120 days)"
+          ],
+          "sla_hours": 8,
+          "can_reject": true,
+          "can_send_back": true
+        },
+        {
+          "step": 2,
+          "approver": "Dr. Andrea Weber",
+          "role": "Head of Operational Purchasing",
+          "action": "Budget & Purchasing Approval",
+          "checks": [
+            "Verify budget availability",
+            "Validate cost center allocation",
+            "Review against annual spend plan",
+            "Confirm contract terms compliance",
+            "Check purchasing policy adherence"
+          ],
+          "sla_hours": 24,
+          "can_reject": true,
+          "can_send_back": true
+        },
+        {
+          "step": 3,
+          "approver": "Stefan Hoffmann",
+          "role": "Compliance Manager",
+          "action": "Compliance & Risk Review",
+          "checks": [
+            "Commodity group compliance (D05AA19AE)",
+            "Regulatory requirements validation",
+            "Supplier compliance verification",
+            "Contract and payment terms review",
+            "Risk assessment for high-value procurement"
+          ],
+          "sla_hours": 48,
+          "can_reject": true,
+          "can_send_back": true
+        }
+      ]
+    },
+
+    "po_release_flow": {
+      "total_approvers": 3,
+      "estimated_total_time_hours": 76,
+      "steps": [
+        {
+          "step": 1,
+          "approver": "Michael Schneider",
+          "role": "Operational Buyer",
+          "action": "PO Creation & Operational Review",
+          "checks": [
+            "PO created from approved PR",
+            "Quantities match PR",
+            "Prices match info record",
+            "Terms and conditions attached",
+            "Delivery schedule confirmed"
+          ],
+          "sla_hours": 4,
+          "can_reject": false,
+          "can_send_back": true
+        },
+        {
+          "step": 2,
+          "approver": "Dr. Andrea Weber",
+          "role": "Head of Operational Purchasing",
+          "action": "Purchasing Release Approval",
+          "checks": [
+            "PR approval chain complete",
+            "Vendor performance acceptable",
+            "No supply chain alerts",
+            "Contract compliance verified",
+            "Purchasing policy adherence"
+          ],
+          "sla_hours": 24,
+          "can_reject": true,
+          "can_send_back": true
+        },
+        {
+          "step": 3,
+          "approver": "Thomas Becker",
+          "role": "Compliance Manager",
+          "action": "Final Compliance Sign-off",
+          "checks": [
+            "High-value compliance authorization",
+            "Regulatory requirements met",
+            "Supplier compliance verified",
+            "Risk assessment complete",
+            "Total spend and contract alignment"
+          ],
+          "sla_hours": 48,
+          "can_reject": true,
+          "can_send_back": false,
+          "final_approval": true
+        }
+      ]
+    }
+  },
+
+  "escalation_rules": {
+    "sla_breach": {
+      "pr_approval": {
+        "first_reminder_hours": 4,
+        "escalation_after_hours": 24,
+        "escalate_to": "Dr. Klaus Müller (VP Procurement)"
+      },
+      "po_release": {
+        "first_reminder_hours": 2,
+        "escalation_after_hours": 12,
+        "escalate_to": "Thomas Becker (Director)"
+      }
+    },
+    "urgent_orders": {
+      "criteria": "Delivery date < 30 days OR Stock < Safety stock",
+      "expedited_sla_reduction": 0.5,
+      "parallel_approvals_allowed": true
+    }
+  },
+
+  "approval_delegates": {
+    "description": "Backup approvers when primary is unavailable",
+    "delegates": [
+      {
+        "primary": "Michael Schneider",
+        "delegate": "Julia Fischer",
+        "delegate_title": "Operational Buyer - Medical Consumables",
+        "delegate_employee_id": "EMP001567"
+      },
+      {
+        "primary": "Dr. Andrea Weber",
+        "delegate": "Martin Krause",
+        "delegate_title": "Deputy Head of Operational Purchasing",
+        "delegate_employee_id": "EMP001099"
+      },
+      {
+        "primary": "Stefan Hoffmann",
+        "delegate": "Sarah Meyer",
+        "delegate_title": "Deputy Compliance Manager",
+        "delegate_employee_id": "EMP000876"
+      },
+      {
+        "primary": "Thomas Becker",
+        "delegate": "Stefan Hoffmann",
+        "delegate_title": "Compliance Manager",
+        "delegate_employee_id": "EMP000654"
+      }
+    ]
+  },
+
+  "approval_history_sample": {
+    "description": "Sample approval records for PL568T orders",
+    "records": [
+      {
+        "document_number": "PR-4211016351",
+        "document_type": "Purchase Requisition",
+        "material": "PL568T",
+        "value": 954752.80,
+        "created_date": "2023-05-15",
+        "created_by": "Hans Dietrich (Inventory Planner)",
+        "approval_chain": [
+          {
+            "step": 1,
+            "approver": "Michael Schneider",
+            "approved_date": "2023-05-15T14:23:00",
+            "decision": "Approved",
+            "comments": "Operational review complete. Specification confirmed. Vendor 1165336 available. Lead time acceptable.",
+            "approval_duration_hours": 2
+          },
+          {
+            "step": 2,
+            "approver": "Dr. Andrea Weber",
+            "approved_date": "2023-05-16T10:15:00",
+            "decision": "Approved",
+            "comments": "Purchasing approval granted. Budget confirmed within annual spend plan. Purchasing policy compliant.",
+            "approval_duration_hours": 20
+          },
+          {
+            "step": 3,
+            "approver": "Stefan Hoffmann",
+            "approved_date": "2023-05-17T16:45:00",
+            "decision": "Approved",
+            "comments": "Compliance review complete. Commodity group D05AA19AE verified. Regulatory requirements met.",
+            "approval_duration_hours": 30
+          }
+        ],
+        "total_approval_time_hours": 52,
+        "linked_po": "4514072353"
+      },
+      {
+        "document_number": "PO-4516638113",
+        "document_type": "Purchase Order",
+        "material": "PL568T",
+        "value": 140940.80,
+        "created_date": "2025-12-09",
+        "created_by": "Michael Schneider (SAP Auto-conversion from PR-4546245893)",
+        "release_chain": [
+          {
+            "step": 1,
+            "approver": "Michael Schneider",
+            "approved_date": "2025-12-09T09:30:00",
+            "decision": "Released",
+            "comments": "Operational review complete. PO created from approved PR. Terms verified.",
+            "approval_duration_hours": 1
+          },
+          {
+            "step": 2,
+            "approver": "Dr. Andrea Weber",
+            "approved_date": "2025-12-09T15:45:00",
+            "decision": "Released",
+            "comments": "Purchasing release approved. Vendor performance: 98% on-time delivery. Purchasing policy compliant.",
+            "approval_duration_hours": 6
+          },
+          {
+            "step": 3,
+            "approver": "Thomas Becker",
+            "approved_date": "2025-12-10T11:20:00",
+            "decision": "Released",
+            "comments": "Compliance sign-off complete. Supplier compliance verified. Total annual spend tracking: EUR 2.5M. Regulatory requirements met.",
+            "approval_duration_hours": 20
+          }
+        ],
+        "total_release_time_hours": 27,
+        "po_sent_to_vendor": "2025-12-10T11:25:00"
+      }
+    ]
+  },
+
+  "notes": [
+    "Approval limits based on actual BBraun 7EF purchasing group value distribution",
+    "PL568T orders (EUR 140,940.80) fall in High Value tier requiring 3-level PR approval",
+    "PO release requires compliance sign-off for values > EUR 100k",
+    "Total end-to-end time: PR approval (~52h) + PO release (~27h) = ~79 hours (~3.3 days)",
+    "User names and employee IDs are fictional but follow German naming conventions",
+    "Roles reflect typical procurement organization: Operational Buyer → Head of Operational Purchasing → Compliance Manager"
+  ]
+}

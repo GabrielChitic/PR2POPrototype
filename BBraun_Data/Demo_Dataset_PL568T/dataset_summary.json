@@ -1,0 +1,22 @@
+{
+  "material": "PL568T",
+  "extraction_date": "2026-01-23 09:53:09",
+  "tables_extracted": [
+    {
+      "table": "EKKO",
+      "rows": 18
+    },
+    {
+      "table": "EKES",
+      "rows": 2
+    },
+    {
+      "table": "EINA",
+      "rows": 1
+    },
+    {
+      "table": "MB52",
+      "rows": 13
+    }
+  ]
+}
